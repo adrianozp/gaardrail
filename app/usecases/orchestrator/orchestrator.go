@@ -3,64 +3,77 @@ package orchestrator
 import (
 	"context"
 	"log"
-	"time"
+
+	"golang.org/x/time/rate"
 )
 
+//go:generate mockery --all --output=mocks --outpkg=mocks
 type Consumer interface {
 	Consume() (string, error)
 	Size() (int64, error)
 }
 
 type Orchestrator struct {
-	DrainRate float64
-	consumer  Consumer
+	limiter  *rate.Limiter
+	consumer Consumer
+	done     chan struct{}
 }
 
 func NewOrchestrator(c Consumer) *Orchestrator {
 	return &Orchestrator{
 		consumer: c,
+		// rate 0 pauses the orchestrator at startup; the PID controller sets the real
+		// drain rate via SetDrainRate once metrics arrive.
+		limiter: rate.NewLimiter(0, 1),
+		done:    make(chan struct{}),
 	}
 }
 
+// Limiter exposes the rate.Limiter for testing purposes.
+func (o *Orchestrator) Limiter() *rate.Limiter {
+	return o.limiter
+}
+
+// Done returns a channel that is closed when the run loop exits.
+func (o *Orchestrator) Done() <-chan struct{} {
+	return o.done
+}
+
 func (o *Orchestrator) SetDrainRate(drainRate float64) error {
-	o.DrainRate = drainRate
+	o.limiter.SetLimit(rate.Limit(drainRate))
 	return nil
 }
 
-func (o Orchestrator) Start(tickRate int) error {
-	ctx := context.Background()
-	go o.run(ctx, tickRate)
+func (o *Orchestrator) Start(ctx context.Context) error {
+	go o.run(ctx)
 	return nil
 }
 
-func (o *Orchestrator) run(ctx context.Context, tickRate int) {
-	ticker := time.NewTicker(time.Duration(tickRate) * time.Millisecond)
-	defer ticker.Stop()
+func (o *Orchestrator) run(ctx context.Context) {
+	defer close(o.done)
 
 	for {
-		select {
-		case <-ctx.Done():
-			log.Println("orchestrator: drain loop shutting down")
+		if err := o.limiter.Wait(ctx); err != nil {
+			log.Println("orchestrator: shutting down")
 			return
-		case <-ticker.C:
 		}
 
-		queuelen, err := o.consumer.Size()
+		queueLen, err := o.consumer.Size()
 		if err != nil {
-			log.Printf("orchestrator: error while getting queue length: %s", err.Error())
+			log.Printf("orchestrator: error getting queue length: %s", err)
 			continue
 		}
 
-		if queuelen == 0 {
+		if queueLen == 0 {
 			continue
 		}
 
-		messageId, err := o.consumer.Consume()
+		messageID, err := o.consumer.Consume()
 		if err != nil {
-			log.Printf("orchestrator: error while consuming queue: %s", err.Error())
+			log.Printf("orchestrator: error consuming message: %s", err)
 			continue
 		}
 
-		log.Printf("orchestrator: sucessful consumed message: %s", messageId)
+		log.Printf("orchestrator: consumed message: %s", messageID)
 	}
 }

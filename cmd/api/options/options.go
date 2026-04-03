@@ -40,7 +40,7 @@ func Options() fx.Option {
 		fx.Invoke(func(lc fx.Lifecycle, o *orchestrator.Orchestrator) {
 			lc.Append(fx.Hook{
 				OnStart: func(ctx context.Context) error {
-					return o.Start(100)
+					return o.Start(ctx)
 				},
 			})
 		}),

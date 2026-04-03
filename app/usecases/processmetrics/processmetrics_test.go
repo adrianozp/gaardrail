@@ -20,7 +20,7 @@ func TestProcess_Success(t *testing.T) {
 	mockController := mocks.NewController(t)
 	mockOrchestrator := mocks.NewOrchestrator(t)
 	mockController.On("Compute", 0.75, now).Return(1.5, nil)
-	mockOrchestrator.On("UpdateDrainRate", 1.5).Return(nil)
+	mockOrchestrator.On("SetDrainRate", 1.5).Return(nil)
 
 	uc := processmetrics.NewProcessMetricsUseCase(mockController, mockOrchestrator)
 	err := uc.Process(metrics)
@@ -67,7 +67,7 @@ func TestProcess_OrchestratorError(t *testing.T) {
 	mockController := mocks.NewController(t)
 	mockOrchestrator := mocks.NewOrchestrator(t)
 	mockController.On("Compute", 0.6, now).Return(2.0, nil)
-	mockOrchestrator.On("UpdateDrainRate", 2.0).Return(errors.New("orchestrator error"))
+	mockOrchestrator.On("SetDrainRate", 2.0).Return(errors.New("orchestrator error"))
 
 	uc := processmetrics.NewProcessMetricsUseCase(mockController, mockOrchestrator)
 	err := uc.Process(metrics)

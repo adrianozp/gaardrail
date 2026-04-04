@@ -5,12 +5,14 @@ import (
 	"time"
 
 	"github.com/adrianozp/gaardrail/app/entities"
-	"github.com/adrianozp/gaardrail/app/repositories"
 	"github.com/adrianozp/gaardrail/pkg/config"
 	"github.com/rs/zerolog/log"
 )
 
 //go:generate mockery --all --output=mocks --outpkg=mocks
+type MetricsReader interface {
+	Read(ctx context.Context) (entities.Metrics, error)
+}
 
 // ProcessMetrics is the port for forwarding collected metrics into the PID pipeline.
 type ProcessMetrics interface {
@@ -22,13 +24,13 @@ type ProcessMetrics interface {
 // logged and skipped — the PID controller retains its last state until the
 // next successful read.
 type PollingHandler struct {
-	reader         repositories.MetricsReader
+	reader         MetricsReader
 	processMetrics ProcessMetrics
 	interval       time.Duration
 	done           chan struct{}
 }
 
-func New(reader repositories.MetricsReader, pm ProcessMetrics, cfg config.Config) *PollingHandler {
+func New(reader MetricsReader, pm ProcessMetrics, cfg config.Config) *PollingHandler {
 	interval := time.Duration(cfg.MetricsPoller.IntervalMs) * time.Millisecond
 	return &PollingHandler{
 		reader:         reader,
@@ -68,12 +70,7 @@ func (h *PollingHandler) run(ctx context.Context) {
 				continue
 			}
 
-			m := entities.Metrics{
-				MeasureTime: time.Now(),
-				Metrics:     metrics,
-			}
-
-			if err := h.processMetrics.Process(m); err != nil {
+			if err := h.processMetrics.Process(metrics); err != nil {
 				log.Error().Err(err).Msg("pollmetrics: process error")
 			}
 		}

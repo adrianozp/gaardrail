@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/adrianozp/gaardrail/app/entities"
+	"github.com/adrianozp/gaardrail/pkg/clock"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 )
@@ -28,38 +30,41 @@ func New(endpoint string, mappings map[string]string) *PrometheusMetricsReader {
 	}
 }
 
-func (r *PrometheusMetricsReader) Read(ctx context.Context) (map[string]float64, error) {
+func (r *PrometheusMetricsReader) Read(ctx context.Context) (entities.Metrics, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, r.endpoint, nil)
 	if err != nil {
-		return nil, err
+		return entities.Metrics{}, err
 	}
 
 	resp, err := r.client.Do(req)
 	if err != nil {
-		return nil, err
+		return entities.Metrics{}, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("prometheus: unexpected status %d", resp.StatusCode)
+		return entities.Metrics{}, fmt.Errorf("prometheus: unexpected status %d", resp.StatusCode)
 	}
 
 	var parser expfmt.TextParser
 	mfs, err := parser.TextToMetricFamilies(resp.Body)
 	if err != nil && len(mfs) == 0 {
-		return nil, fmt.Errorf("prometheus: parse error: %w", err)
+		return entities.Metrics{}, fmt.Errorf("prometheus: parse error: %w", err)
 	}
 
-	result := make(map[string]float64)
+	metric := entities.Metrics{
+		MeasureTime: clock.Now(),
+		Metrics:     make(map[string]float64),
+	}
 	for source, domain := range r.mappings {
 		mf, ok := mfs[source]
 		if !ok || len(mf.GetMetric()) == 0 {
 			continue
 		}
-		result[domain] = sampleValue(mf.GetMetric()[0])
+		metric.Metrics[domain] = sampleValue(mf.GetMetric()[0])
 	}
 
-	return result, nil
+	return metric, nil
 }
 
 func sampleValue(m *dto.Metric) float64 {

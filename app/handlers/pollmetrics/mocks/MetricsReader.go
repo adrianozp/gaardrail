@@ -5,6 +5,7 @@ package mocks
 import (
 	context "context"
 
+	entities "github.com/adrianozp/gaardrail/app/entities"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -14,24 +15,22 @@ type MetricsReader struct {
 }
 
 // Read provides a mock function with given fields: ctx
-func (_m *MetricsReader) Read(ctx context.Context) (map[string]float64, error) {
+func (_m *MetricsReader) Read(ctx context.Context) (entities.Metrics, error) {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Read")
 	}
 
-	var r0 map[string]float64
+	var r0 entities.Metrics
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (map[string]float64, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) (entities.Metrics, error)); ok {
 		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) map[string]float64); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) entities.Metrics); ok {
 		r0 = rf(ctx)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[string]float64)
-		}
+		r0 = ret.Get(0).(entities.Metrics)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context) error); ok {

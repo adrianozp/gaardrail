@@ -7,6 +7,7 @@ require (
 	github.com/creasty/defaults v1.8.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-playground/validator/v10 v10.30.1
+	github.com/google/uuid v1.6.0
 	github.com/prometheus/client_model v0.6.2
 	github.com/prometheus/common v0.62.0
 	github.com/rs/zerolog v1.35.0

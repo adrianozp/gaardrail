@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/adrianozp/gaardrail/app/entities"
+	"github.com/rs/zerolog/log"
 )
 
 //go:generate mockery --all --output=mocks --outpkg=mocks
@@ -31,11 +32,13 @@ func NewProcessMetricsUseCase(c Controller, o Orchestrator) ProcessMetricsUseCas
 func (u ProcessMetricsUseCase) Process(m entities.Metrics) error {
 	cpuPercentage, ok := m.Metrics["cpu"]
 	if !ok {
+		log.Error().Msg("cpu metric not found")
 		return errors.New("cpu metric not found")
 	}
 
 	drainRate, err := u.controller.Compute(cpuPercentage, m.MeasureTime)
 	if err != nil {
+		log.Error().Msg("computing drain rate")
 		return err
 	}
 

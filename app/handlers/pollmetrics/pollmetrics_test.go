@@ -9,23 +9,22 @@ import (
 	"github.com/adrianozp/gaardrail/app/entities"
 	"github.com/adrianozp/gaardrail/app/handlers/pollmetrics"
 	"github.com/adrianozp/gaardrail/app/handlers/pollmetrics/mocks"
-	repomocks "github.com/adrianozp/gaardrail/app/repositories/mocks"
 	"github.com/adrianozp/gaardrail/pkg/config"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
 func TestPollingHandler_CallsReadAndProcessOnEachTick(t *testing.T) {
-	mockReader := repomocks.NewMetricsReader(t)
+	mockReader := mocks.NewMetricsReader(t)
 	mockProcess := mocks.NewProcessMetrics(t)
 
 	ticked := make(chan struct{}, 3)
 
-	mockReader.On("Read", mock.Anything).
-		Return(map[string]float64{"cpu": 0.4}, nil)
-	mockProcess.On("Process", mock.MatchedBy(func(m entities.Metrics) bool {
-		return m.Metrics["cpu"] == 0.4
-	})).Run(func(_ mock.Arguments) {
+	metric := entities.Metrics{
+		Metrics: map[string]float64{"cpu": 0.4},
+	}
+	mockReader.On("Read", mock.Anything).Return(metric, nil)
+	mockProcess.On("Process", metric).Run(func(_ mock.Arguments) {
 		ticked <- struct{}{}
 	}).Return(nil)
 
@@ -44,18 +43,21 @@ func TestPollingHandler_CallsReadAndProcessOnEachTick(t *testing.T) {
 }
 
 func TestPollingHandler_ReadErrorDoesNotStopLoop(t *testing.T) {
-	mockReader := repomocks.NewMetricsReader(t)
+	mockReader := mocks.NewMetricsReader(t)
 	mockProcess := mocks.NewProcessMetrics(t)
 
 	processed := make(chan struct{}, 1)
 
-	mockReader.On("Read", mock.Anything).
-		Return(map[string]float64(nil), errors.New("read failed")).Once()
-	mockReader.On("Read", mock.Anything).
-		Return(map[string]float64{"cpu": 0.5}, nil)
-	mockProcess.On("Process", mock.MatchedBy(func(m entities.Metrics) bool {
-		return m.Metrics["cpu"] == 0.5
-	})).Run(func(_ mock.Arguments) {
+	emptyMetric := entities.Metrics{
+		Metrics: map[string]float64(nil),
+	}
+	metric := entities.Metrics{
+		Metrics: map[string]float64{"cpu": 0.5},
+	}
+
+	mockReader.On("Read", mock.Anything).Return(emptyMetric, errors.New("read failed")).Once()
+	mockReader.On("Read", mock.Anything).Return(metric, nil)
+	mockProcess.On("Process", metric).Run(func(_ mock.Arguments) {
 		processed <- struct{}{}
 	}).Return(nil)
 
@@ -73,7 +75,7 @@ func TestPollingHandler_ReadErrorDoesNotStopLoop(t *testing.T) {
 }
 
 func TestPollingHandler_ContextCancellationExitsCleanly(t *testing.T) {
-	mockReader := repomocks.NewMetricsReader(t)
+	mockReader := mocks.NewMetricsReader(t)
 	mockProcess := mocks.NewProcessMetrics(t)
 
 	ctx, cancel := context.WithCancel(context.Background())

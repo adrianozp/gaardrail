@@ -26,7 +26,7 @@ func metricsMiddleware() gin.HandlerFunc {
 		log.Info().
 			Str("method", c.Request.Method).
 			Str("path", c.Request.URL.Path).
-			Dur("duration", time.Since(start)).
+			Dur("duration_ms", time.Since(start)).
 			Msg("request")
 	}
 }

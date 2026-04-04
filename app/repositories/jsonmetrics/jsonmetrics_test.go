@@ -5,8 +5,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
+	"github.com/adrianozp/gaardrail/app/entities"
 	"github.com/adrianozp/gaardrail/app/repositories/jsonmetrics"
+	"github.com/adrianozp/gaardrail/pkg/clock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,19 +23,24 @@ func TestJSONMetricsReader_Read_ExtractsMappedFields(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	clock.WithTime(time.Date(1995, 11, 11, 0, 0, 0, 0, time.UTC))
 	mappings := map[string]string{
 		"cpu_usage":          "cpu",
 		"active_connections": "connections",
 	}
 	reader := jsonmetrics.New(srv.URL, mappings)
 
-	result, err := reader.Read(context.Background())
-
+	resultMetric, err := reader.Read(context.Background())
 	require.NoError(t, err)
-	assert.InDelta(t, 0.55, result["cpu"], 0.001)
-	assert.InDelta(t, 7.0, result["connections"], 0.001)
-	_, hasIgnored := result["ignored"]
-	assert.False(t, hasIgnored, "unmapped field should not appear in result")
+
+	expectedMetric := entities.Metrics{
+		Metrics: map[string]float64{
+			"cpu":         0.55,
+			"connections": 7,
+		},
+		MeasureTime: time.Date(1995, 11, 11, 0, 0, 0, 0, time.UTC),
+	}
+	require.Equal(t, expectedMetric, resultMetric)
 }
 
 func TestJSONMetricsReader_Read_HTTPError(t *testing.T) {

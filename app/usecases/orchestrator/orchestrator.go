@@ -24,7 +24,7 @@ func NewOrchestrator(c Consumer) *Orchestrator {
 		consumer: c,
 		// rate 0 pauses the orchestrator at startup; the PID controller sets the real
 		// drain rate via SetDrainRate once metrics arrive.
-		limiter: rate.NewLimiter(0, 1),
+		limiter: rate.NewLimiter(9999, 1),
 		done:    make(chan struct{}),
 	}
 }
@@ -40,6 +40,7 @@ func (o *Orchestrator) Done() <-chan struct{} {
 }
 
 func (o *Orchestrator) SetDrainRate(drainRate float64) error {
+	log.Info().Float64("drain_rate", drainRate).Msg("orchestrator: updated drain rate")
 	o.limiter.SetLimit(rate.Limit(drainRate))
 	return nil
 }
@@ -53,9 +54,10 @@ func (o *Orchestrator) run(ctx context.Context) {
 	defer close(o.done)
 
 	for {
+		ctx := context.Background()
 		if err := o.limiter.Wait(ctx); err != nil {
-			log.Info().Msg("orchestrator: shutting down")
-			return
+			log.Info().Err(err).Msg("orchestrator: shutting down")
+			break
 		}
 
 		queueLen, err := o.consumer.Size()
@@ -68,12 +70,10 @@ func (o *Orchestrator) run(ctx context.Context) {
 			continue
 		}
 
-		messageID, err := o.consumer.Consume()
+		_, err = o.consumer.Consume()
 		if err != nil {
 			log.Error().Err(err).Msg("orchestrator: error consuming message")
 			continue
 		}
-
-		log.Info().Str("message_id", messageID).Msg("orchestrator: consumed message")
 	}
 }

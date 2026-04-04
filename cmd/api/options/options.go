@@ -19,7 +19,6 @@ func Options() fx.Option {
 		),
 
 		modules.KafkaFactories(),
-		modules.HTTPFactories(),
 
 		modules.OrchestratorFactories(),
 		modules.OrchestratorInjections(),

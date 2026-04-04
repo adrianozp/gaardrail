@@ -1,12 +1,12 @@
-package repositories
+package readers
 
 import (
 	"context"
 	"fmt"
 
 	"github.com/adrianozp/gaardrail/app/entities"
-	jsonmetricsrepo "github.com/adrianozp/gaardrail/app/repositories/jsonmetrics"
-	prometheusrepo "github.com/adrianozp/gaardrail/app/repositories/prometheus"
+	jsonmetricsrepo "github.com/adrianozp/gaardrail/app/repositories/readers/jsonmetrics"
+	prometheusrepo "github.com/adrianozp/gaardrail/app/repositories/readers/prometheus"
 	"github.com/adrianozp/gaardrail/pkg/config"
 )
 

@@ -3,8 +3,10 @@ package controller
 import (
 	"errors"
 	"math"
+	"sync"
 	"time"
 
+	"github.com/adrianozp/gaardrail/app/entities"
 	"github.com/adrianozp/gaardrail/pkg/config"
 	"github.com/adrianozp/gaardrail/pkg/metrics"
 )
@@ -13,6 +15,7 @@ import (
 // output(t) = clamp(P + I(t) + D, Min, Max)
 // This is the absolute output (e.g. drain rate RPS), not a delta.
 type Controller struct {
+	mu         sync.RWMutex
 	Kp, Ki, Kd float64
 	Min, Max   float64 // output clamp
 	// IClamp is the anti-windup bound for the integral term.
@@ -68,6 +71,10 @@ func (c *Controller) Compute(measured float64, measureTime time.Time) (float64, 
 	if math.IsNaN(measured) {
 		return 0, errors.New("invalid measured metric")
 	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	dt, err := c.getDt(measureTime)
 	if err != nil {
 		return 0, err
@@ -88,7 +95,7 @@ func (c *Controller) Compute(measured float64, measureTime time.Time) (float64, 
 
 	output := clamp(p+c.i+d, c.Min, c.Max)
 
-	metricsMap := map[string]float64{
+	metrics.Gauge(map[string]float64{
 		"pid_setpoint": c.setpoint,
 		"pid_measured": measured,
 		"pid_error":    e,
@@ -96,13 +103,58 @@ func (c *Controller) Compute(measured float64, measureTime time.Time) (float64, 
 		"pid_i_term":   c.i,
 		"pid_d_term":   d,
 		"pid_output":   p + c.i + d,
-	}
-	metrics.Gauge(metricsMap)
+		"pid_kp":       c.Kp,
+		"pid_ki":       c.Ki,
+		"pid_kd":       c.Kd,
+		"pid_i_clamp":  c.IClamp,
+		"pid_max":      c.Max,
+	})
 
 	return output, nil
 }
 
-func (c Controller) getDt(measureTime time.Time) (float64, error) {
+// SetParams updates PID parameters at runtime. Only non-nil fields are updated.
+// Resets integral accumulator to avoid windup from previous gains.
+func (c *Controller) SetParams(p entities.PIDParams) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if p.Kp != nil {
+		c.Kp = *p.Kp
+	}
+	if p.Ki != nil {
+		c.Ki = *p.Ki
+	}
+	if p.Kd != nil {
+		c.Kd = *p.Kd
+	}
+	if p.Min != nil {
+		c.Min = *p.Min
+	}
+	if p.Max != nil {
+		c.Max = *p.Max
+	}
+	if p.IClamp != nil {
+		c.IClamp = *p.IClamp
+	}
+	if p.Setpoint != nil {
+		c.setpoint = *p.Setpoint
+	}
+
+	if c.Min > c.Max {
+		return errors.New("pid: min must be <= max")
+	}
+	if c.IClamp < 0 {
+		return errors.New("pid: i_clamp must be >= 0")
+	}
+
+	// Reset integral to avoid windup artifacts from previous gains
+	c.i = 0
+
+	return nil
+}
+
+func (c *Controller) getDt(measureTime time.Time) (float64, error) {
 	if measureTime.Before(c.lastCompute) {
 		return 0, errors.New("outdated measure")
 	}

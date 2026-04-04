@@ -32,6 +32,10 @@ func Options() fx.Option {
 		modules.MessageInjections(),
 		modules.MessageEndpoints(),
 
+		modules.PIDFactories(),
+		modules.PIDInjections(),
+		modules.PIDEndpoints(),
+
 		fx.Invoke(func(lc fx.Lifecycle, router *gin.Engine, cfg config.Config) {
 			router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 			lc.Append(fx.Hook{

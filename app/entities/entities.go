@@ -11,5 +11,3 @@ type Metrics struct {
 	MeasureTime time.Time
 	Metrics     map[string]float64
 }
-
-type OrchestratorParams struct{}

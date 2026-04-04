@@ -16,7 +16,7 @@ import (
 
 
 func defaultCfg() config.Config {
-	return config.Config{Orchestrator: config.Orchestrator{Rate: 100, Burst: 10}}
+	return config.Config{Orchestrator: config.Orchestrator{Rate: 100, Burst: 10, Workers: 1}}
 }
 
 func TestSetDrainRate_UpdatesLimiterLimit(t *testing.T) {

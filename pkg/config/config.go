@@ -11,9 +11,11 @@ import (
 )
 
 type Config struct {
-	HTTP  HTTP  `mapstructure:"http"`
-	Kafka Kafka `mapstructure:"kafka"`
-	Target Target `mapstructure:"target"`
+	HTTP          HTTP          `mapstructure:"http"`
+	Kafka         Kafka         `mapstructure:"kafka"`
+	Target        Target        `mapstructure:"target"`
+	MetricsPoller MetricsPoller `mapstructure:"metrics_poller"`
+	PID           PID           `mapstructure:"pid"`
 }
 
 type HTTP struct {
@@ -30,6 +32,24 @@ type Kafka struct {
 type Target struct {
 	BaseURL string `mapstructure:"base_url" default:"http://localhost:9090" validate:"required"`
 	Path    string `mapstructure:"path"     default:"/events"              validate:"required"`
+}
+
+type MetricsPoller struct {
+	Enabled    bool              `mapstructure:"enabled"     default:"false"`
+	IntervalMs int               `mapstructure:"interval_ms" default:"5000"`
+	Endpoint   string            `mapstructure:"endpoint"`
+	Protocol   string            `mapstructure:"protocol"    default:"prometheus"`
+	Mappings   map[string]string `mapstructure:"mappings"`
+}
+
+type PID struct {
+	Kp       float64 `mapstructure:"kp"        default:"1.0"`
+	Ki       float64 `mapstructure:"ki"        default:"0.1"`
+	Kd       float64 `mapstructure:"kd"        default:"0.01"`
+	Min      float64 `mapstructure:"min"       default:"1.0"`
+	Max      float64 `mapstructure:"max"       default:"100.0"`
+	IClamp   float64 `mapstructure:"i_clamp"   default:"100.0"`
+	Setpoint float64 `mapstructure:"setpoint"  default:"70.0"`
 }
 
 func Load() (Config, error) {
@@ -58,6 +78,17 @@ func Load() (Config, error) {
 	_ = viper.BindEnv("kafka.group_id")
 	_ = viper.BindEnv("target.base_url")
 	_ = viper.BindEnv("target.path")
+	_ = viper.BindEnv("metrics_poller.enabled")
+	_ = viper.BindEnv("metrics_poller.interval_ms")
+	_ = viper.BindEnv("metrics_poller.endpoint")
+	_ = viper.BindEnv("metrics_poller.protocol")
+	_ = viper.BindEnv("pid.kp")
+	_ = viper.BindEnv("pid.ki")
+	_ = viper.BindEnv("pid.kd")
+	_ = viper.BindEnv("pid.min")
+	_ = viper.BindEnv("pid.max")
+	_ = viper.BindEnv("pid.i_clamp")
+	_ = viper.BindEnv("pid.setpoint")
 
 	if err := viper.Unmarshal(&cfg); err != nil {
 		return Config{}, err

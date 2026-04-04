@@ -24,6 +24,10 @@ func Options() fx.Option {
 		modules.OrchestratorFactories(),
 		modules.OrchestratorInjections(),
 
+		modules.MetricsPollerFactories(),
+		modules.MetricsPollerInjections(),
+		modules.MetricsPollerLifecycle(),
+
 		modules.MessageFactories(),
 		modules.MessageInjections(),
 		modules.MessageEndpoints(),

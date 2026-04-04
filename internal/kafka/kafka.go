@@ -1,6 +1,9 @@
 package kafka
 
-import "github.com/IBM/sarama"
+import (
+	"github.com/IBM/sarama"
+	"github.com/adrianozp/gaardrail/pkg/config"
+)
 
 type Client struct {
 	client   sarama.Client
@@ -11,30 +14,23 @@ type Client struct {
 	topic    string
 }
 
-type Config struct {
-	Brokers   []string
-	Topic     string
-	Partition int32
-	GroupID   string
-}
-
-func New(cfg Config) (*Client, error) {
+func New(cfg config.Config) (*Client, error) {
 	saramaCfg := sarama.NewConfig()
 	saramaCfg.Consumer.Return.Errors = true
 	saramaCfg.Consumer.Offsets.AutoCommit.Enable = false
 	saramaCfg.Producer.Return.Successes = true
 
-	client, err := sarama.NewClient(cfg.Brokers, saramaCfg)
+	client, err := sarama.NewClient(cfg.Kafka.Brokers, saramaCfg)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := ensureTopic(client, cfg.Topic, cfg.Partition+1); err != nil {
+	if err := ensureTopic(client, cfg.Kafka.Topic, cfg.Kafka.Partition+1); err != nil {
 		client.Close()
 		return nil, err
 	}
 
-	if err := client.RefreshMetadata(cfg.Topic); err != nil {
+	if err := client.RefreshMetadata(cfg.Kafka.Topic); err != nil {
 		client.Close()
 		return nil, err
 	}
@@ -45,14 +41,14 @@ func New(cfg Config) (*Client, error) {
 		return nil, err
 	}
 
-	manager, err := sarama.NewOffsetManagerFromClient(cfg.GroupID, client)
+	manager, err := sarama.NewOffsetManagerFromClient(cfg.Kafka.GroupID, client)
 	if err != nil {
 		consumer.Close()
 		client.Close()
 		return nil, err
 	}
 
-	pom, err := manager.ManagePartition(cfg.Topic, cfg.Partition)
+	pom, err := manager.ManagePartition(cfg.Kafka.Topic, cfg.Kafka.Partition)
 	if err != nil {
 		manager.Close()
 		consumer.Close()
@@ -65,7 +61,7 @@ func New(cfg Config) (*Client, error) {
 		nextOffset = sarama.OffsetOldest
 	}
 
-	pc, err := consumer.ConsumePartition(cfg.Topic, cfg.Partition, nextOffset)
+	pc, err := consumer.ConsumePartition(cfg.Kafka.Topic, cfg.Kafka.Partition, nextOffset)
 	if err != nil {
 		pom.Close()
 		manager.Close()
@@ -90,7 +86,7 @@ func New(cfg Config) (*Client, error) {
 		producer: producer,
 		manager:  manager,
 		pom:      pom,
-		topic:    cfg.Topic,
+		topic:    cfg.Kafka.Topic,
 	}, nil
 }
 

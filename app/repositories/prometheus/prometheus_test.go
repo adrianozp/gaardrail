@@ -40,17 +40,17 @@ func TestPrometheusMetricsReader_Read_ExtractsMappedMetrics(t *testing.T) {
 	}
 	reader := prometheus.New(srv.URL, mappings)
 
-	resultMetric, err := reader.Read(context.Background())
+	result, err := reader.Read(context.Background())
 	require.NoError(t, err)
 
-	expectedMetric := entities.Metrics{
+	expected := entities.Metrics{
 		Metrics: map[string]float64{
 			"cpu":         0.42,
 			"connections": 12,
 		},
 		MeasureTime: time.Date(1995, 11, 11, 0, 0, 0, 0, time.UTC),
 	}
-	require.Equal(t, expectedMetric, resultMetric)
+	require.Equal(t, expected, result)
 }
 
 func TestPrometheusMetricsReader_Read_HTTPError(t *testing.T) {
@@ -74,6 +74,8 @@ func TestPrometheusMetricsReader_Read_MissingMetricSkipped(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	now := time.Date(1995, 11, 11, 0, 0, 0, 0, time.UTC)
+	clock.WithTime(now)
 	mappings := map[string]string{
 		"nonexistent_metric": "cpu",
 	}
@@ -81,6 +83,10 @@ func TestPrometheusMetricsReader_Read_MissingMetricSkipped(t *testing.T) {
 
 	result, err := reader.Read(context.Background())
 
+	expected := entities.Metrics{
+		MeasureTime: now,
+		Metrics:     make(map[string]float64),
+	}
 	require.NoError(t, err)
-	assert.Empty(t, result)
+	assert.Equal(t, expected, result)
 }

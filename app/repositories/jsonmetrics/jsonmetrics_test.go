@@ -30,17 +30,17 @@ func TestJSONMetricsReader_Read_ExtractsMappedFields(t *testing.T) {
 	}
 	reader := jsonmetrics.New(srv.URL, mappings)
 
-	resultMetric, err := reader.Read(context.Background())
+	result, err := reader.Read(context.Background())
 	require.NoError(t, err)
 
-	expectedMetric := entities.Metrics{
+	expected := entities.Metrics{
 		Metrics: map[string]float64{
 			"cpu":         0.55,
 			"connections": 7,
 		},
 		MeasureTime: time.Date(1995, 11, 11, 0, 0, 0, 0, time.UTC),
 	}
-	require.Equal(t, expectedMetric, resultMetric)
+	require.Equal(t, expected, result)
 }
 
 func TestJSONMetricsReader_Read_HTTPError(t *testing.T) {
@@ -67,8 +67,15 @@ func TestJSONMetricsReader_Read_MissingFieldSkipped(t *testing.T) {
 
 	reader := jsonmetrics.New(srv.URL, map[string]string{"cpu_usage": "cpu"})
 
+	now := time.Date(1995, 11, 11, 0, 0, 0, 0, time.UTC)
+	clock.WithTime(now)
 	result, err := reader.Read(context.Background())
 
+	expected := entities.Metrics{
+		MeasureTime: now,
+		Metrics:     make(map[string]float64),
+	}
+
 	require.NoError(t, err)
-	assert.Empty(t, result)
+	assert.Equal(t, expected, result)
 }

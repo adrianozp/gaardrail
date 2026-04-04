@@ -3,6 +3,7 @@ package consumemessage
 import (
 	"github.com/adrianozp/gaardrail/app/entities"
 	"github.com/adrianozp/gaardrail/pkg/clock"
+	"github.com/adrianozp/gaardrail/pkg/metrics"
 	"github.com/rs/zerolog/log"
 )
 
@@ -51,6 +52,7 @@ func (u ConsumeMessageUseCase) Consume() (string, error) {
 
 	elapsedTime := clock.Now().Sub(startTime).Seconds()
 	log.Info().Str("message_id", message.ID).Float64("elapsed_time", elapsedTime).Msg("consumed message")
+	metrics.Incr([]string{"messages_processed_total"})
 	return message.ID, nil
 }
 

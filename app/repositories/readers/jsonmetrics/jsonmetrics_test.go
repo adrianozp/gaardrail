@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/adrianozp/gaardrail/app/entities"
-	"github.com/adrianozp/gaardrail/app/repositories/jsonmetrics"
+	"github.com/adrianozp/gaardrail/app/repositories/readers/jsonmetrics"
 	"github.com/adrianozp/gaardrail/pkg/clock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

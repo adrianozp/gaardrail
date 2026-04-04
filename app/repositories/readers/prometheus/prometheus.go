@@ -9,7 +9,12 @@ import (
 	"github.com/adrianozp/gaardrail/pkg/clock"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
+	"github.com/prometheus/common/model"
 )
+
+func init() {
+	model.NameValidationScheme = model.UTF8Validation
+}
 
 // PrometheusMetricsReader scrapes a Prometheus text-format endpoint and maps
 // source metric names to domain names via the configured Mappings.
@@ -46,7 +51,7 @@ func (r *PrometheusMetricsReader) Read(ctx context.Context) (entities.Metrics, e
 		return entities.Metrics{}, fmt.Errorf("prometheus: unexpected status %d", resp.StatusCode)
 	}
 
-	var parser expfmt.TextParser
+	parser := expfmt.NewTextParser(model.NameValidationScheme)
 	mfs, err := parser.TextToMetricFamilies(resp.Body)
 	if err != nil && len(mfs) == 0 {
 		return entities.Metrics{}, fmt.Errorf("prometheus: parse error: %w", err)

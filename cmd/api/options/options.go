@@ -8,6 +8,7 @@ import (
 	"github.com/adrianozp/gaardrail/internal/httpserver"
 	"github.com/adrianozp/gaardrail/pkg/config"
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/fx"
 )
 
@@ -32,6 +33,7 @@ func Options() fx.Option {
 		modules.MessageEndpoints(),
 
 		fx.Invoke(func(lc fx.Lifecycle, router *gin.Engine, cfg config.Config) {
+			router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 			lc.Append(fx.Hook{
 				OnStart: func(ctx context.Context) error {
 					go router.Run(cfg.HTTP.Addr)
@@ -43,7 +45,7 @@ func Options() fx.Option {
 		fx.Invoke(func(lc fx.Lifecycle, o *orchestrator.Orchestrator) {
 			lc.Append(fx.Hook{
 				OnStart: func(ctx context.Context) error {
-					return o.Start(ctx)
+					return o.Start(context.Background())
 				},
 			})
 		}),

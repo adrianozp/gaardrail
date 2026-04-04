@@ -35,7 +35,7 @@ func MetricsPollerLifecycle() fx.Option {
 		}
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
-				return ph.Start(ctx)
+				return ph.Start(context.Background())
 			},
 		})
 	})

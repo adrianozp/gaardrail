@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/adrianozp/gaardrail/pkg/config"
+	"github.com/adrianozp/gaardrail/pkg/metrics"
 )
 
 // Controller is a discrete PID controller in position form.
@@ -85,7 +86,19 @@ func (c *Controller) Compute(measured float64, measureTime time.Time) (float64, 
 	c.prevE = e
 	c.lastCompute = measureTime
 
-	return clamp(p+c.i+d, c.Min, c.Max), nil
+	output := clamp(p+c.i+d, c.Min, c.Max)
+
+	metrics.Gauge(map[string]float64{
+		"pid_setpoint": c.setpoint,
+		"pid_measured": measured,
+		"pid_error":    e,
+		"pid_p_term":   p,
+		"pid_i_term":   c.i,
+		"pid_d_term":   d,
+		"pid_output":   p + c.i + d,
+	})
+
+	return output, nil
 }
 
 func (c Controller) getDt(measureTime time.Time) (float64, error) {

@@ -6,7 +6,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/adrianozp/gaardrail/app/entities"
-	sqlrepo "github.com/adrianozp/gaardrail/app/repositories/sql"
+	sqlrepo "github.com/adrianozp/gaardrail/app/repositories/targets/sql"
 	sqlclient "github.com/adrianozp/gaardrail/internal/sqlclient"
 	"github.com/stretchr/testify/require"
 )

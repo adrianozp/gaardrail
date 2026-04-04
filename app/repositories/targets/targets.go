@@ -21,7 +21,10 @@ func NewTarget(cfg config.Config) (Pusher, error) {
 		client := httpclient.New(httpclient.Config{BaseURL: cfg.Target.BaseURL})
 		return httprepo.NewHTTPRepository(client, httprepo.Config{Path: cfg.Target.Path}), nil
 	case "sql":
-		client, err := sqlclient.New(sqlclient.Config{DSN: cfg.Target.DSN})
+		client, err := sqlclient.New(sqlclient.Config{
+			DSN:    cfg.Target.DSN,
+			Driver: cfg.Target.Driver,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("target: sql: %w", err)
 		}

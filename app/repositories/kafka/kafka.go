@@ -32,7 +32,6 @@ func (r *KafkaRepository) Enqueue(m entities.Message) (string, error) {
 }
 
 func (r *KafkaRepository) Dequeue() (entities.Message, error) {
-	log.Debug().Msg("kafka: dequeing msg")
 	msg := <-r.client.Messages()
 	log.Debug().Msg("kafka: msg dequeued")
 

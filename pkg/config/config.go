@@ -16,6 +16,7 @@ type Config struct {
 	Target        Target        `mapstructure:"target"`
 	MetricsPoller MetricsPoller `mapstructure:"metrics_poller"`
 	PID           PID           `mapstructure:"pid"`
+	Orchestrator  Orchestrator  `mapstructure:"orchestrator"`
 }
 
 type HTTP struct {
@@ -34,6 +35,7 @@ type Target struct {
 	BaseURL  string `mapstructure:"base_url" default:"http://localhost:9090"`
 	Path     string `mapstructure:"path"     default:"/events"`
 	DSN      string `mapstructure:"dsn"`
+	Driver   string `mapstructure:"driver"   default:"mysql"`
 }
 
 type MetricsPoller struct {
@@ -52,6 +54,11 @@ type PID struct {
 	Max      float64 `mapstructure:"max"       default:"100.0"`
 	IClamp   float64 `mapstructure:"i_clamp"   default:"100.0"`
 	Setpoint float64 `mapstructure:"setpoint"  default:"70.0"`
+}
+
+type Orchestrator struct {
+	Rate  int `mapstructure:"rate"        default:"100"`
+	Burst int `mapstructure:"burst"        default:"10"`
 }
 
 func Load() (Config, error) {
@@ -82,6 +89,7 @@ func Load() (Config, error) {
 	_ = viper.BindEnv("target.base_url")
 	_ = viper.BindEnv("target.path")
 	_ = viper.BindEnv("target.dsn")
+	_ = viper.BindEnv("target.driver")
 	_ = viper.BindEnv("metrics_poller.enabled")
 	_ = viper.BindEnv("metrics_poller.interval_ms")
 	_ = viper.BindEnv("metrics_poller.endpoint")
@@ -93,6 +101,8 @@ func Load() (Config, error) {
 	_ = viper.BindEnv("pid.max")
 	_ = viper.BindEnv("pid.i_clamp")
 	_ = viper.BindEnv("pid.setpoint")
+	_ = viper.BindEnv("orchestrator.rate")
+	_ = viper.BindEnv("orchestrator.burst")
 
 	if err := viper.Unmarshal(&cfg); err != nil {
 		return Config{}, err

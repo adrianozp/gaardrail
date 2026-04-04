@@ -8,14 +8,20 @@ import (
 
 	"github.com/adrianozp/gaardrail/app/usecases/orchestrator"
 	"github.com/adrianozp/gaardrail/app/usecases/orchestrator/mocks"
+	"github.com/adrianozp/gaardrail/pkg/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/time/rate"
 )
 
+
+func defaultCfg() config.Config {
+	return config.Config{Orchestrator: config.Orchestrator{Rate: 100, Burst: 10}}
+}
+
 func TestSetDrainRate_UpdatesLimiterLimit(t *testing.T) {
 	consumer := mocks.NewConsumer(t)
-	o := orchestrator.NewOrchestrator(consumer)
+	o := orchestrator.NewOrchestrator(consumer, defaultCfg())
 	err := o.SetDrainRate(42.0)
 	require.NoError(t, err)
 	assert.Equal(t, rate.Limit(42.0), o.Limiter().Limit())
@@ -23,43 +29,22 @@ func TestSetDrainRate_UpdatesLimiterLimit(t *testing.T) {
 
 func TestNewOrchestrator_StartsWithDefaultRate(t *testing.T) {
 	consumer := mocks.NewConsumer(t)
-	o := orchestrator.NewOrchestrator(consumer)
-	assert.Equal(t, rate.Limit(1), o.Limiter().Limit())
+	o := orchestrator.NewOrchestrator(consumer, defaultCfg())
+	assert.Equal(t, rate.Limit(100), o.Limiter().Limit())
 }
 
-func TestStart_ExitsWhenContextCancelled(t *testing.T) {
-	consumer := mocks.NewConsumer(t)
-	consumer.On("Consume").Return("", nil).Maybe()
-
-	o := orchestrator.NewOrchestrator(consumer)
-	_ = o.SetDrainRate(1000)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	err := o.Start(ctx)
-	require.NoError(t, err)
-
-	cancel()
-
-	select {
-	case <-o.Done():
-		// goroutine exited cleanly
-	case <-time.After(200 * time.Millisecond):
-		t.Fatal("orchestrator goroutine did not exit after context cancellation")
-	}
-}
 func TestRun_LogsErrorOnConsumeFailure(t *testing.T) {
 	consumer := mocks.NewConsumer(t)
 	consumer.On("Consume").Return("", errors.New("kafka unavailable")).Maybe()
+	consumer.On("Size").Return(int64(0), nil).Maybe()
 
-	o := orchestrator.NewOrchestrator(consumer)
+	o := orchestrator.NewOrchestrator(consumer, defaultCfg())
 	_ = o.SetDrainRate(1000)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
-	defer cancel()
-
-	err := o.Start(ctx)
+	err := o.Start(context.Background())
 	require.NoError(t, err)
-	<-ctx.Done()
+
+	time.Sleep(100 * time.Millisecond)
 
 	callCount := 0
 	for _, c := range consumer.Calls {

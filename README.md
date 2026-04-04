@@ -180,3 +180,84 @@ make kafka/setup
 make run
 ```
 
+---
+
+## Flood test
+
+The flood test exercises the full control loop under load. It requires the infrastructure from the previous section to be running.
+
+### 1. Start the flood stack
+
+The flood stack extends the base infra with cAdvisor and a dedicated Grafana dashboard:
+
+```bash
+docker compose -f flood-test/docker-compose-flood.yml up -d
+```
+
+Open Grafana at [http://localhost:3000](http://localhost:3000) — the **Flood Test** dashboard is provisioned automatically.
+
+### 2. Set up the database
+
+Creates the `flood_data` table and seeds it with 1 million rows across 5 indexes, providing enough data volume to generate meaningful CPU pressure:
+
+```bash
+./flood-test/scripts/setup-db.sh
+```
+
+### 3. Send messages to the queue
+
+Each message payload is a heavy SQL query (full scans, self-joins, correlated subqueries). The orchestrator will pull them from Kafka and execute them against MySQL.
+
+```bash
+# send 2000 messages (default)
+./flood-test/scripts/flood.sh
+
+# send a custom amount
+./flood-test/scripts/flood.sh 5000
+```
+
+### 4. (Optional) Add an external disturbance
+
+To observe the controller reacting to a sudden CPU spike independent of the message queue, run parallel `BENCHMARK` queries directly on MySQL:
+
+```bash
+# 3 workers for 60 seconds (defaults)
+./flood-test/scripts/disturb.sh
+
+# custom: 5 workers, lighter iterations, 30 seconds
+./flood-test/scripts/disturb.sh 2 5000 30
+
+# run indefinitely until Ctrl+C
+./flood-test/scripts/disturb.sh 2 5000 0
+```
+
+### 5. Tune the controller live
+
+PID parameters can be adjusted at any time without restarting the application. Changes take effect on the next poll tick and are visible in the **PID Params History** panel.
+
+All fields are optional — only the ones present in the body are updated. Changing any parameter resets the integral accumulator to prevent windup artifacts from previous gains.
+
+```bash
+curl -X PATCH http://localhost:8080/pid \
+  -H "Content-Type: application/json" \
+  -d '{
+    "setpoint": 50.0,
+    "kp": 0.15,
+    "ki": 0.05,
+    "kd": 0.02,
+    "min": 0.0,
+    "max": 10.0,
+    "i_clamp": 5.0
+  }'
+```
+
+| Field | Description |
+|-------|-------------|
+| `setpoint` | Target CPU % |
+| `kp` | Proportional gain |
+| `ki` | Integral gain |
+| `kd` | Derivative gain |
+| `min` | Minimum drain rate (msgs/s) |
+| `max` | Maximum drain rate (msgs/s) |
+| `i_clamp` | Anti-windup bound on the integral accumulator |
+

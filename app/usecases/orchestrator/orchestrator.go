@@ -17,6 +17,7 @@ type Orchestrator struct {
 	limiter  *rate.Limiter
 	consumer Consumer
 	done     chan struct{}
+	ctx      context.Context
 }
 
 func NewOrchestrator(c Consumer) *Orchestrator {
@@ -24,17 +25,15 @@ func NewOrchestrator(c Consumer) *Orchestrator {
 		consumer: c,
 		// rate 0 pauses the orchestrator at startup; the PID controller sets the real
 		// drain rate via SetDrainRate once metrics arrive.
-		limiter: rate.NewLimiter(9999, 1),
+		limiter: rate.NewLimiter(1, 1),
 		done:    make(chan struct{}),
 	}
 }
 
-// Limiter exposes the rate.Limiter for testing purposes.
 func (o *Orchestrator) Limiter() *rate.Limiter {
 	return o.limiter
 }
 
-// Done returns a channel that is closed when the run loop exits.
 func (o *Orchestrator) Done() <-chan struct{} {
 	return o.done
 }
@@ -46,34 +45,31 @@ func (o *Orchestrator) SetDrainRate(drainRate float64) error {
 }
 
 func (o *Orchestrator) Start(ctx context.Context) error {
-	go o.run(ctx)
+	o.ctx = ctx
+	go o.run()
 	return nil
 }
 
-func (o *Orchestrator) run(ctx context.Context) {
+func (o *Orchestrator) run() {
 	defer close(o.done)
 
 	for {
+		select {
+		case <-o.ctx.Done():
+			log.Info().Msg("orchestrator: context canceled, shutting down")
+			return
+		default:
+		}
+
 		ctx := context.Background()
 		if err := o.limiter.Wait(ctx); err != nil {
-			log.Info().Err(err).Msg("orchestrator: shutting down")
-			break
-		}
-
-		queueLen, err := o.consumer.Size()
-		if err != nil {
-			log.Error().Err(err).Msg("orchestrator: error getting queue length")
+			log.Warn().Err(err).Msg("orchestrator: rate limiter error, retrying")
 			continue
 		}
 
-		if queueLen == 0 {
-			continue
-		}
-
-		_, err = o.consumer.Consume()
+		_, err := o.consumer.Consume()
 		if err != nil {
 			log.Error().Err(err).Msg("orchestrator: error consuming message")
-			continue
 		}
 	}
 }

@@ -7,23 +7,28 @@ import (
 	"github.com/adrianozp/gaardrail/app/entities"
 	"github.com/adrianozp/gaardrail/app/usecases/createmessage"
 	"github.com/adrianozp/gaardrail/app/usecases/createmessage/mocks"
+	"github.com/adrianozp/gaardrail/pkg/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestCreate_Success(t *testing.T) {
-	msg := entities.Message{ID: "msg-1"}
+	testUUID := "success-uuid"
+	uuid.WithString(testUUID)
+	msg := entities.Message{ID: testUUID, Body: []byte("msg-1")}
 	mockQueue := mocks.NewQueue(t)
-	mockQueue.On("Enqueue", msg).Return("generated-id", nil)
+	mockQueue.On("Enqueue", msg).Return(testUUID, nil)
 
 	uc := createmessage.NewCreateMessageUseCase(mockQueue)
 	id, err := uc.Create(msg)
 
 	assert.NoError(t, err)
-	assert.Equal(t, "generated-id", id)
+	assert.Equal(t, testUUID, id)
 }
 
 func TestCreate_QueueError(t *testing.T) {
-	msg := entities.Message{ID: "msg-2"}
+	testUUID := "queue-error-uuid"
+	uuid.WithString(testUUID)
+	msg := entities.Message{ID: testUUID, Body: []byte("msg-2")}
 	mockQueue := mocks.NewQueue(t)
 	mockQueue.On("Enqueue", msg).Return("", errors.New("queue unavailable"))
 

@@ -9,7 +9,6 @@ import (
 
 	"github.com/adrianozp/gaardrail/app/entities"
 	"github.com/adrianozp/gaardrail/app/repositories/readers/prometheusapi"
-	"github.com/adrianozp/gaardrail/pkg/clock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -30,8 +29,6 @@ func TestPrometheusAPIReader_Read_ReturnsMappedValue(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	clock.WithTime(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
-
 	reader := prometheusapi.New(srv.URL, map[string]string{
 		"rate(process_cpu_seconds_total[15s])*100": "cpu",
 	})
@@ -40,7 +37,7 @@ func TestPrometheusAPIReader_Read_ReturnsMappedValue(t *testing.T) {
 	require.NoError(t, err)
 
 	expected := entities.Metrics{
-		MeasureTime: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+		MeasureTime: time.Unix(1234567890, 0).UTC(),
 		Metrics:     map[string]float64{"cpu": 47.5},
 	}
 	require.Equal(t, expected, result)

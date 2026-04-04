@@ -54,6 +54,10 @@ func (u ConsumeMessageUseCase) Consume() (string, error) {
 	processTime := clock.Now().Sub(message.CreatedAt).Seconds()
 	log.Info().Str("message_id", message.ID).Float64("consume_time", consumeTime).Float64("process_time", processTime).Msg("consumed message")
 	metrics.Incr([]string{"messages_processed_total"})
+	metrics.Gauge(map[string]float64{
+		"consume_time_seconds": consumeTime,
+		"process_time_seconds": processTime,
+	})
 	return message.ID, nil
 }
 

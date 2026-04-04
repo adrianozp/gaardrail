@@ -10,6 +10,7 @@ import (
 	"github.com/adrianozp/gaardrail/app/handlers/pollmetrics"
 	"github.com/adrianozp/gaardrail/app/handlers/pollmetrics/mocks"
 	repomocks "github.com/adrianozp/gaardrail/app/repositories/mocks"
+	"github.com/adrianozp/gaardrail/pkg/config"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -30,7 +31,7 @@ func TestPollingHandler_CallsReadAndProcessOnEachTick(t *testing.T) {
 
 	ctx := t.Context()
 
-	handler := pollmetrics.New(mockReader, mockProcess, 5*time.Millisecond)
+	handler := pollmetrics.New(mockReader, mockProcess, config.Config{MetricsPoller: config.MetricsPoller{IntervalMs: 5}})
 	require.NoError(t, handler.Start(ctx))
 
 	for i := range 2 {
@@ -60,7 +61,7 @@ func TestPollingHandler_ReadErrorDoesNotStopLoop(t *testing.T) {
 
 	ctx := t.Context()
 
-	handler := pollmetrics.New(mockReader, mockProcess, 5*time.Millisecond)
+	handler := pollmetrics.New(mockReader, mockProcess, config.Config{MetricsPoller: config.MetricsPoller{IntervalMs: 5}})
 	require.NoError(t, handler.Start(ctx))
 
 	select {
@@ -78,7 +79,7 @@ func TestPollingHandler_ContextCancellationExitsCleanly(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// long interval — we cancel before the first tick
-	handler := pollmetrics.New(mockReader, mockProcess, 1*time.Hour)
+	handler := pollmetrics.New(mockReader, mockProcess, config.Config{MetricsPoller: config.MetricsPoller{IntervalMs: 3600000}})
 	require.NoError(t, handler.Start(ctx))
 
 	cancel()

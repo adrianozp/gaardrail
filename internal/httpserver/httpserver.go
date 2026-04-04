@@ -1,11 +1,11 @@
 package httpserver
 
 import (
-	"log"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog/log"
 )
 
 func New() *gin.Engine {
@@ -23,6 +23,10 @@ func metricsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		c.Next()
-		log.Printf("method=%s path=%s duration=%s", c.Request.Method, c.Request.URL.Path, time.Since(start))
+		log.Info().
+			Str("method", c.Request.Method).
+			Str("path", c.Request.URL.Path).
+			Dur("duration", time.Since(start)).
+			Msg("request")
 	}
 }

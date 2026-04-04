@@ -2,11 +2,12 @@ package pollmetrics
 
 import (
 	"context"
-	"log"
 	"time"
 
 	"github.com/adrianozp/gaardrail/app/entities"
 	"github.com/adrianozp/gaardrail/app/repositories"
+	"github.com/adrianozp/gaardrail/pkg/config"
+	"github.com/rs/zerolog/log"
 )
 
 //go:generate mockery --all --output=mocks --outpkg=mocks
@@ -27,7 +28,8 @@ type PollingHandler struct {
 	done           chan struct{}
 }
 
-func New(reader repositories.MetricsReader, pm ProcessMetrics, interval time.Duration) *PollingHandler {
+func New(reader repositories.MetricsReader, pm ProcessMetrics, cfg config.Config) *PollingHandler {
+	interval := time.Duration(cfg.MetricsPoller.IntervalMs) * time.Millisecond
 	return &PollingHandler{
 		reader:         reader,
 		processMetrics: pm,
@@ -57,12 +59,12 @@ func (h *PollingHandler) run(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("pollmetrics: shutting down")
+			log.Info().Msg("pollmetrics: shutting down")
 			return
 		case <-ticker.C:
 			metrics, err := h.reader.Read(ctx)
 			if err != nil {
-				log.Printf("pollmetrics: read error: %s", err)
+				log.Error().Err(err).Msg("pollmetrics: read error")
 				continue
 			}
 
@@ -72,7 +74,7 @@ func (h *PollingHandler) run(ctx context.Context) {
 			}
 
 			if err := h.processMetrics.Process(m); err != nil {
-				log.Printf("pollmetrics: process error: %s", err)
+				log.Error().Err(err).Msg("pollmetrics: process error")
 			}
 		}
 	}

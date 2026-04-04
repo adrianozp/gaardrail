@@ -1,12 +1,12 @@
 package config
 
 import (
-	"log"
 	"os"
 	"strings"
 
 	"github.com/creasty/defaults"
 	"github.com/go-playground/validator/v10"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 )
 
@@ -64,7 +64,7 @@ func Load() (Config, error) {
 	viper.AddConfigPath(os.Getenv("APP_PATH"))
 
 	if err := viper.ReadInConfig(); err != nil {
-		log.Printf("config: no config file found, using defaults and env vars")
+		log.Warn().Err(err).Msg("config: no config file found, using defaults and env vars")
 	}
 
 	viper.SetEnvPrefix("APP")

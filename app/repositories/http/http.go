@@ -2,10 +2,10 @@ package http
 
 import (
 	"encoding/json"
-	"log"
 
 	"github.com/adrianozp/gaardrail/app/entities"
 	"github.com/adrianozp/gaardrail/internal/httpclient"
+	"github.com/rs/zerolog/log"
 )
 
 type Config struct {
@@ -30,6 +30,6 @@ func (r *HTTPRepository) Push(m entities.Message) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("sent command body %s", body)
+	log.Debug().Bytes("body", body).Msg("sent command body")
 	return r.client.Post(r.path, body)
 }

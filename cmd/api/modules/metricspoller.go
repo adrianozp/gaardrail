@@ -3,7 +3,6 @@ package modules
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/adrianozp/gaardrail/app/handlers/pollmetrics"
 	"github.com/adrianozp/gaardrail/app/repositories"
@@ -17,10 +16,10 @@ import (
 
 func MetricsPollerFactories() fx.Option {
 	return fx.Provide(
-		newPIDController,
+		controller.New,
 		processmetrics.NewProcessMetricsUseCase,
 		newMetricsReader,
-		newPollingHandler,
+		pollmetrics.New,
 	)
 }
 
@@ -44,18 +43,6 @@ func MetricsPollerLifecycle() fx.Option {
 	})
 }
 
-func newPIDController(cfg config.Config) *controller.Controller {
-	return controller.New(controller.ControllerParams{
-		Kp:       cfg.PID.Kp,
-		Ki:       cfg.PID.Ki,
-		Kd:       cfg.PID.Kd,
-		Min:      cfg.PID.Min,
-		Max:      cfg.PID.Max,
-		IClamp:   cfg.PID.IClamp,
-		Setpoint: cfg.PID.Setpoint,
-	})
-}
-
 func newMetricsReader(cfg config.Config) (repositories.MetricsReader, error) {
 	if !cfg.MetricsPoller.Enabled {
 		return &noopMetricsReader{}, nil
@@ -68,11 +55,6 @@ func newMetricsReader(cfg config.Config) (repositories.MetricsReader, error) {
 	default:
 		return nil, fmt.Errorf("metricspoller: unknown protocol %q", cfg.MetricsPoller.Protocol)
 	}
-}
-
-func newPollingHandler(reader repositories.MetricsReader, pm pollmetrics.ProcessMetrics, cfg config.Config) *pollmetrics.PollingHandler {
-	interval := time.Duration(cfg.MetricsPoller.IntervalMs) * time.Millisecond
-	return pollmetrics.New(reader, pm, interval)
 }
 
 // noopMetricsReader is used when MetricsPoller.Enabled is false.

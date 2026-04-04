@@ -2,8 +2,8 @@ package orchestrator
 
 import (
 	"context"
-	"log"
 
+	"github.com/rs/zerolog/log"
 	"golang.org/x/time/rate"
 )
 
@@ -54,13 +54,13 @@ func (o *Orchestrator) run(ctx context.Context) {
 
 	for {
 		if err := o.limiter.Wait(ctx); err != nil {
-			log.Println("orchestrator: shutting down")
+			log.Info().Msg("orchestrator: shutting down")
 			return
 		}
 
 		queueLen, err := o.consumer.Size()
 		if err != nil {
-			log.Printf("orchestrator: error getting queue length: %s", err)
+			log.Error().Err(err).Msg("orchestrator: error getting queue length")
 			continue
 		}
 
@@ -70,10 +70,10 @@ func (o *Orchestrator) run(ctx context.Context) {
 
 		messageID, err := o.consumer.Consume()
 		if err != nil {
-			log.Printf("orchestrator: error consuming message: %s", err)
+			log.Error().Err(err).Msg("orchestrator: error consuming message")
 			continue
 		}
 
-		log.Printf("orchestrator: consumed message: %s", messageID)
+		log.Info().Str("message_id", messageID).Msg("orchestrator: consumed message")
 	}
 }

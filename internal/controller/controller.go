@@ -4,6 +4,8 @@ import (
 	"errors"
 	"math"
 	"time"
+
+	"github.com/adrianozp/gaardrail/pkg/config"
 )
 
 // Controller is a discrete PID controller in position form.
@@ -36,22 +38,22 @@ type ControllerParams struct {
 }
 
 // New creates a Controller. iClamp prevents integral windup.
-func New(params ControllerParams) *Controller {
-	if params.Min > params.Max {
+func New(cfg config.Config) *Controller {
+	if cfg.PID.Min > cfg.PID.Max {
 		panic("pid.New: min must be <= max")
 	}
-	if params.IClamp < 0 {
+	if cfg.PID.IClamp < 0 {
 		panic("pid.New: iClamp must be >= 0")
 	}
 	return &Controller{
-		Kp:       params.Kp,
-		Ki:       params.Ki,
-		Kd:       params.Kd,
-		Min:      params.Min,
-		Max:      params.Max,
-		IClamp:   params.IClamp,
+		Kp:       cfg.PID.Kp,
+		Ki:       cfg.PID.Ki,
+		Kd:       cfg.PID.Kd,
+		Min:      cfg.PID.Min,
+		Max:      cfg.PID.Max,
+		IClamp:   cfg.PID.IClamp,
 		first:    true,
-		setpoint: params.Setpoint,
+		setpoint: cfg.PID.Setpoint,
 	}
 }
 

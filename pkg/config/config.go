@@ -30,8 +30,10 @@ type Kafka struct {
 }
 
 type Target struct {
-	BaseURL string `mapstructure:"base_url" default:"http://localhost:9090" validate:"required"`
-	Path    string `mapstructure:"path"     default:"/events"              validate:"required"`
+	Protocol string `mapstructure:"protocol" default:"http" validate:"required"`
+	BaseURL  string `mapstructure:"base_url" default:"http://localhost:9090"`
+	Path     string `mapstructure:"path"     default:"/events"`
+	DSN      string `mapstructure:"dsn"`
 }
 
 type MetricsPoller struct {
@@ -76,8 +78,10 @@ func Load() (Config, error) {
 	_ = viper.BindEnv("kafka.topic")
 	_ = viper.BindEnv("kafka.partition")
 	_ = viper.BindEnv("kafka.group_id")
+	_ = viper.BindEnv("target.protocol")
 	_ = viper.BindEnv("target.base_url")
 	_ = viper.BindEnv("target.path")
+	_ = viper.BindEnv("target.dsn")
 	_ = viper.BindEnv("metrics_poller.enabled")
 	_ = viper.BindEnv("metrics_poller.interval_ms")
 	_ = viper.BindEnv("metrics_poller.endpoint")

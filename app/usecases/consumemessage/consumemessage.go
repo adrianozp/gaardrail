@@ -31,7 +31,7 @@ func NewConsumeMessageUseCase(q Queue, t Target) ConsumeMessageUseCase {
 }
 
 func (u ConsumeMessageUseCase) Consume() (string, error) {
-	startTime := clock.Now()
+	consumeStartTime := clock.Now()
 	message, err := u.queue.Dequeue()
 	if err != nil {
 		log.Error().Msg("error dequeing message")
@@ -50,8 +50,9 @@ func (u ConsumeMessageUseCase) Consume() (string, error) {
 		return "", err
 	}
 
-	elapsedTime := clock.Now().Sub(startTime).Seconds()
-	log.Info().Str("message_id", message.ID).Float64("elapsed_time", elapsedTime).Msg("consumed message")
+	consumeTime := clock.Now().Sub(consumeStartTime).Seconds()
+	processTime := clock.Now().Sub(message.CreatedAt).Seconds()
+	log.Info().Str("message_id", message.ID).Float64("consume_time", consumeTime).Float64("process_time", processTime).Msg("consumed message")
 	metrics.Incr([]string{"messages_processed_total"})
 	return message.ID, nil
 }

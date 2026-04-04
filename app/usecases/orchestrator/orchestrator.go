@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"time"
 
 	"github.com/adrianozp/gaardrail/pkg/config"
 	"github.com/adrianozp/gaardrail/pkg/metrics"
@@ -20,15 +21,15 @@ type Orchestrator struct {
 	consumer Consumer
 	done     chan struct{}
 	ctx      context.Context
+	workers  int
 }
 
 func NewOrchestrator(c Consumer, cfg config.Config) *Orchestrator {
 	return &Orchestrator{
 		consumer: c,
-		// rate 0 pauses the orchestrator at startup; the PID controller sets the real
-		// drain rate via SetDrainRate once metrics arrive.
-		limiter: rate.NewLimiter(rate.Limit(cfg.Orchestrator.Rate), cfg.Orchestrator.Burst),
-		done:    make(chan struct{}),
+		limiter:  rate.NewLimiter(rate.Limit(cfg.Orchestrator.Rate), cfg.Orchestrator.Burst),
+		done:     make(chan struct{}),
+		workers:  cfg.Orchestrator.Workers,
 	}
 }
 
@@ -41,7 +42,7 @@ func (o *Orchestrator) Done() <-chan struct{} {
 }
 
 func (o *Orchestrator) SetDrainRate(drainRate float64) error {
-	log.Info().Float64("drain_rate", drainRate).Msg("orchestrator: updated drain rate")
+	log.Debug().Float64("drain_rate", drainRate).Msg("orchestrator: updated drain rate")
 	o.limiter.SetLimit(rate.Limit(drainRate))
 	metrics.Gauge(map[string]float64{"drain_rate": drainRate})
 	return nil
@@ -49,13 +50,14 @@ func (o *Orchestrator) SetDrainRate(drainRate float64) error {
 
 func (o *Orchestrator) Start(ctx context.Context) error {
 	o.ctx = ctx
-	go o.run()
+	for i := 0; i < o.workers; i++ {
+		go o.worker()
+	}
+	go o.lagPoller()
 	return nil
 }
 
-func (o *Orchestrator) run() {
-	defer close(o.done)
-
+func (o *Orchestrator) worker() {
 	for {
 		select {
 		case <-o.ctx.Done():
@@ -64,21 +66,34 @@ func (o *Orchestrator) run() {
 		default:
 		}
 
-		ctx := context.Background()
-		if err := o.limiter.Wait(ctx); err != nil {
+		if o.Limiter().Limit() == 0 {
+			log.Info().Msg("orchestrator: limiter not set waiting")
+			time.Sleep(1 * time.Second)
+			continue
+		}
+
+		if err := o.limiter.Wait(context.Background()); err != nil {
 			log.Warn().Err(err).Msg("orchestrator: rate limiter error, retrying")
 			continue
 		}
 
-		go func() {
-			_, err := o.consumer.Consume()
-			if err != nil {
-				log.Error().Err(err).Msg("orchestrator: error consuming message")
-			}
-		}()
+		if _, err := o.consumer.Consume(); err != nil {
+			log.Error().Err(err).Msg("orchestrator: error consuming message")
+		}
+	}
+}
 
-		if lag, err := o.consumer.Size(); err == nil {
-			metrics.Gauge(map[string]float64{"queue_lag": float64(lag)})
+func (o *Orchestrator) lagPoller() {
+	t := time.NewTicker(2 * time.Second)
+	defer t.Stop()
+	for {
+		select {
+		case <-o.ctx.Done():
+			return
+		case <-t.C:
+			if lag, err := o.consumer.Size(); err == nil {
+				metrics.Gauge(map[string]float64{"queue_lag": float64(lag)})
+			}
 		}
 	}
 }

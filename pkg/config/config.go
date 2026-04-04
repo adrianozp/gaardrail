@@ -57,8 +57,9 @@ type PID struct {
 }
 
 type Orchestrator struct {
-	Rate  int `mapstructure:"rate"        default:"100"`
-	Burst int `mapstructure:"burst"        default:"10"`
+	Rate    int `mapstructure:"rate"    default:"0"`
+	Burst   int `mapstructure:"burst"   default:"10"`
+	Workers int `mapstructure:"workers" default:"1"`
 }
 
 func Load() (Config, error) {
@@ -103,6 +104,7 @@ func Load() (Config, error) {
 	_ = viper.BindEnv("pid.setpoint")
 	_ = viper.BindEnv("orchestrator.rate")
 	_ = viper.BindEnv("orchestrator.burst")
+	_ = viper.BindEnv("orchestrator.workers")
 
 	if err := viper.Unmarshal(&cfg); err != nil {
 		return Config{}, err

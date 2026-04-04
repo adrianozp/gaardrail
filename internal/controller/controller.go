@@ -88,7 +88,7 @@ func (c *Controller) Compute(measured float64, measureTime time.Time) (float64, 
 
 	output := clamp(p+c.i+d, c.Min, c.Max)
 
-	metrics.Gauge(map[string]float64{
+	metricsMap := map[string]float64{
 		"pid_setpoint": c.setpoint,
 		"pid_measured": measured,
 		"pid_error":    e,
@@ -96,7 +96,8 @@ func (c *Controller) Compute(measured float64, measureTime time.Time) (float64, 
 		"pid_i_term":   c.i,
 		"pid_d_term":   d,
 		"pid_output":   p + c.i + d,
-	})
+	}
+	metrics.Gauge(metricsMap)
 
 	return output, nil
 }

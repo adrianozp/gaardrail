@@ -1,6 +1,9 @@
 package handlers
 
-import "github.com/adrianozp/gaardrail/app/entities"
+import (
+	"github.com/adrianozp/gaardrail/app/entities"
+	"github.com/adrianozp/gaardrail/pkg/clock"
+)
 
 type createMessageRequest struct {
 	Payload string `json:"payload" binding:"required"`
@@ -8,6 +11,7 @@ type createMessageRequest struct {
 
 func (c createMessageRequest) toMessage() entities.Message {
 	return entities.Message{
-		Body: []byte(c.Payload),
+		Body:      []byte(c.Payload),
+		CreatedAt: clock.Now(),
 	}
 }

@@ -3,9 +3,10 @@ package entities
 import "time"
 
 type Message struct {
-	ID   string
-	Ack  func() error
-	Body []byte
+	ID        string
+	Ack       func() error
+	Body      []byte
+	CreatedAt time.Time
 }
 
 type Metrics struct {

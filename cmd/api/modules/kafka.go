@@ -1,14 +1,10 @@
 package modules
 
 import (
-	kafkaclient "github.com/adrianozp/gaardrail/internal/kafka"
-	kafkarepo "github.com/adrianozp/gaardrail/app/repositories/kafka"
+	queuerepo "github.com/adrianozp/gaardrail/app/repositories/queue"
 	"go.uber.org/fx"
 )
 
-func KafkaFactories() fx.Option {
-	return fx.Provide(
-		kafkaclient.New,
-		kafkarepo.NewKafkaRepository,
-	)
+func QueueFactories() fx.Option {
+	return fx.Provide(queuerepo.New)
 }

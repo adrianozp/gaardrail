@@ -2,7 +2,7 @@ package modules
 
 import (
 	createMessageHandler "github.com/adrianozp/gaardrail/app/handlers/createmessage"
-	kafkarepo "github.com/adrianozp/gaardrail/app/repositories/kafka"
+	queuerepo "github.com/adrianozp/gaardrail/app/repositories/queue"
 	"github.com/adrianozp/gaardrail/app/usecases/createmessage"
 	"go.uber.org/fx"
 )
@@ -17,7 +17,7 @@ func MessageFactories() fx.Option {
 func MessageInjections() fx.Option {
 	return fx.Provide(
 		func(uc createmessage.CreateMessageUseCase) createMessageHandler.CreateMessageUseCase { return uc },
-		func(repo *kafkarepo.KafkaRepository) createmessage.Queue { return repo },
+		func(repo queuerepo.Queue) createmessage.Queue { return repo },
 	)
 }
 

@@ -19,7 +19,7 @@ func Options() fx.Option {
 			httpserver.New,
 		),
 
-		modules.KafkaFactories(),
+		modules.QueueFactories(),
 
 		modules.OrchestratorFactories(),
 		modules.OrchestratorInjections(),

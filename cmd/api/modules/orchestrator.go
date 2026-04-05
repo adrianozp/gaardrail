@@ -1,7 +1,7 @@
 package modules
 
 import (
-	kafkarepo "github.com/adrianozp/gaardrail/app/repositories/kafka"
+	queuerepo "github.com/adrianozp/gaardrail/app/repositories/queue"
 	"github.com/adrianozp/gaardrail/app/repositories/targets"
 	"github.com/adrianozp/gaardrail/app/usecases/consumemessage"
 	"github.com/adrianozp/gaardrail/app/usecases/orchestrator"
@@ -19,7 +19,7 @@ func OrchestratorFactories() fx.Option {
 
 func OrchestratorInjections() fx.Option {
 	return fx.Provide(
-		func(repo *kafkarepo.KafkaRepository) consumemessage.Queue { return repo },
+		func(repo queuerepo.Queue) consumemessage.Queue { return repo },
 		func(cfg config.Config) (consumemessage.Target, error) {
 			return targets.NewTarget(cfg)
 		},

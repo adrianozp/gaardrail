@@ -12,11 +12,17 @@ import (
 
 type Config struct {
 	HTTP          HTTP          `mapstructure:"http"`
+	Queue         Queue         `mapstructure:"queue"`
 	Kafka         Kafka         `mapstructure:"kafka"`
 	Target        Target        `mapstructure:"target"`
 	MetricsPoller MetricsPoller `mapstructure:"metrics_poller"`
 	PID           PID           `mapstructure:"pid"`
 	Orchestrator  Orchestrator  `mapstructure:"orchestrator"`
+}
+
+type Queue struct {
+	Protocol string `mapstructure:"protocol" default:"kafka" validate:"required"`
+	Capacity int    `mapstructure:"capacity" default:"1000"`
 }
 
 type HTTP struct {
@@ -82,6 +88,8 @@ func Load() (Config, error) {
 	viper.AutomaticEnv()
 
 	_ = viper.BindEnv("http.addr")
+	_ = viper.BindEnv("queue.protocol")
+	_ = viper.BindEnv("queue.capacity")
 	_ = viper.BindEnv("kafka.brokers")
 	_ = viper.BindEnv("kafka.topic")
 	_ = viper.BindEnv("kafka.partition")

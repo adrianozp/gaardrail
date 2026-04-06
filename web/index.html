@@ -137,6 +137,81 @@
       height: 100%;
       border: none;
     }
+
+    #flood-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #da363344;
+      border: 1px solid #da363388;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    #flood-dot:hover {
+      background: #da363388;
+      border-color: #da3633cc;
+    }
+
+    #flood-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: #0d1117cc;
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    #flood-backdrop.open { display: flex; }
+
+    #flood-modal {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 18px;
+      width: 240px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    #flood-modal h3 {
+      color: #da3633;
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      font-family: monospace;
+    }
+    .flood-field { display: flex; flex-direction: column; gap: 3px; }
+    .flood-field label {
+      color: #8b949e;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .flood-field input {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 3px;
+      padding: 4px 7px;
+      color: #e6edf3;
+      font-family: monospace;
+      font-size: 12px;
+      outline: none;
+    }
+    .flood-field input:focus { border-color: #58a6ff; }
+    #flood-msg { font-size: 11px; min-height: 14px; }
+    #btn-flood {
+      background: #da3633;
+      border: none;
+      color: #fff;
+      font-family: monospace;
+      font-size: 12px;
+      padding: 5px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    #btn-flood:hover { background: #f85149; }
+    #btn-flood:disabled { opacity: 0.5; cursor: default; }
   </style>
 </head>
 <body>
@@ -148,6 +223,23 @@
       <span id="error-msg"></span>
       <button id="btn-cancel" onclick="cancelEdit()"  style="display:none">✕ Cancelar</button>
       <button id="btn-save"   onclick="saveParams()"  style="display:none">✓ Salvar</button>
+    </div>
+    <div id="flood-dot" onclick="openFlood()" title="flood"></div>
+  </div>
+
+  <div id="flood-backdrop" onclick="backdropClick(event)">
+    <div id="flood-modal">
+      <h3>⚡ flood queue</h3>
+      <div class="flood-field">
+        <label>Payload</label>
+        <input type="text" id="flood-payload" placeholder="mensagem de teste">
+      </div>
+      <div class="flood-field">
+        <label>Quantity (max 10 000)</label>
+        <input type="number" id="flood-qty" value="1000" min="1" max="10000">
+      </div>
+      <span id="flood-msg"></span>
+      <button id="btn-flood" onclick="sendFlood()">▶ flood</button>
     </div>
   </div>
   <div id="grafana">
@@ -270,7 +362,74 @@
     function show(id) { document.getElementById(id).style.display = ''; }
     function hide(id) { document.getElementById(id).style.display = 'none'; }
 
+    function openFlood() {
+      document.getElementById('flood-msg').textContent = '';
+      document.getElementById('flood-msg').style.color = '';
+      document.getElementById('btn-flood').disabled = false;
+      document.getElementById('btn-flood').textContent = '▶ flood';
+      document.getElementById('flood-payload').disabled = false;
+      document.getElementById('flood-qty').disabled = false;
+      document.getElementById('flood-backdrop').classList.add('open');
+    }
+
+    function closeFlood() {
+      document.getElementById('flood-backdrop').classList.remove('open');
+    }
+
+    function backdropClick(e) {
+      if (e.target === document.getElementById('flood-backdrop')) closeFlood();
+    }
+
+    async function sendFlood() {
+      const payload = document.getElementById('flood-payload').value;
+      const qty = parseInt(document.getElementById('flood-qty').value, 10);
+
+      if (!payload) {
+        showFloodMsg('payload obrigatório', '#da3633');
+        return;
+      }
+      if (isNaN(qty) || qty < 1 || qty > 10000) {
+        showFloodMsg('quantity: 1–10000', '#da3633');
+        return;
+      }
+
+      setFloodLoading(true);
+      try {
+        const res = await fetch(`/messages/flood?quantity=${qty}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ payload }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showFloodMsg(data.error || `Erro ${res.status}`, '#da3633');
+          setFloodLoading(false);
+          return;
+        }
+        showFloodMsg(`✓ queued: ${data.queued}`, '#238636');
+        setTimeout(closeFlood, 2000);
+      } catch (_) {
+        showFloodMsg('erro de rede', '#da3633');
+        setFloodLoading(false);
+      }
+    }
+
+    function setFloodLoading(loading) {
+      const btn = document.getElementById('btn-flood');
+      btn.disabled = loading;
+      btn.textContent = loading ? 'sending...' : '▶ flood';
+      document.getElementById('flood-payload').disabled = loading;
+      document.getElementById('flood-qty').disabled = loading;
+    }
+
+    function showFloodMsg(msg, color) {
+      const el = document.getElementById('flood-msg');
+      el.textContent = msg;
+      el.style.color = color;
+    }
+
     document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closeFlood();
       if (e.key === 'Enter' && editing) saveParams();
     });
 

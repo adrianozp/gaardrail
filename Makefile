@@ -27,3 +27,6 @@ flood/messages:
 
 run:
 	go run ./cmd/api
+
+docker/build:
+	docker build -t gaardrail .

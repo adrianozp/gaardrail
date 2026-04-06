@@ -1,0 +1,198 @@
+openapi: 3.0.3
+info:
+  title: Gaardrail API
+  version: 1.0.0
+  description: API de controle de fluxo baseada em PID para regulação de mensagens em filas
+
+servers:
+  - url: http://localhost:8080
+    description: Local
+
+paths:
+  /ping:
+    get:
+      summary: Health check
+      operationId: ping
+      tags: [Health]
+      responses:
+        "200":
+          description: Serviço disponível
+
+  /metrics:
+    get:
+      summary: Métricas Prometheus
+      operationId: getMetrics
+      tags: [Observability]
+      responses:
+        "200":
+          description: Métricas no formato text/plain Prometheus
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /messages:
+    post:
+      summary: Enfileira uma mensagem
+      operationId: createMessage
+      tags: [Messages]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMessageRequest"
+            example:
+              payload: "minha mensagem"
+      responses:
+        "201":
+          description: Mensagem criada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateMessageResponse"
+              example:
+                id: "abc-123"
+        "400":
+          description: Payload inválido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Erro interno
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /pid:
+    get:
+      summary: Retorna os parâmetros atuais do controlador PID
+      operationId: getPIDParams
+      tags: [PID]
+      responses:
+        "200":
+          description: Parâmetros PID
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PIDParamsResponse"
+              example:
+                kp: 1.0
+                ki: 0.5
+                kd: 0.1
+                min: 0.0
+                max: 100.0
+                i_clamp: 10.0
+                setpoint: 50.0
+
+    patch:
+      summary: Atualiza parcialmente os parâmetros do controlador PID
+      operationId: updatePIDParams
+      tags: [PID]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePIDParamsRequest"
+            example:
+              kp: 1.2
+              setpoint: 60.0
+      responses:
+        "204":
+          description: Parâmetros atualizados com sucesso
+        "400":
+          description: JSON inválido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Valores inválidos para os parâmetros
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    CreateMessageRequest:
+      type: object
+      required: [payload]
+      properties:
+        payload:
+          type: string
+          description: Conteúdo da mensagem a ser enfileirada
+
+    CreateMessageResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Identificador único da mensagem criada
+
+    PIDParamsResponse:
+      type: object
+      properties:
+        kp:
+          type: number
+          format: double
+          description: Ganho proporcional
+        ki:
+          type: number
+          format: double
+          description: Ganho integral
+        kd:
+          type: number
+          format: double
+          description: Ganho derivativo
+        min:
+          type: number
+          format: double
+          description: Limite mínimo da saída do controlador
+        max:
+          type: number
+          format: double
+          description: Limite máximo da saída do controlador
+        i_clamp:
+          type: number
+          format: double
+          description: Limite do acumulador integral (anti-windup)
+        setpoint:
+          type: number
+          format: double
+          description: Valor alvo para o controlador
+
+    UpdatePIDParamsRequest:
+      type: object
+      description: Todos os campos são opcionais — apenas os informados serão atualizados
+      properties:
+        kp:
+          type: number
+          format: double
+        ki:
+          type: number
+          format: double
+        kd:
+          type: number
+          format: double
+        min:
+          type: number
+          format: double
+        max:
+          type: number
+          format: double
+        i_clamp:
+          type: number
+          format: double
+        setpoint:
+          type: number
+          format: double
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string

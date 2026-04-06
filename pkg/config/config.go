@@ -18,6 +18,11 @@ type Config struct {
 	MetricsPoller MetricsPoller `mapstructure:"metrics_poller"`
 	PID           PID           `mapstructure:"pid"`
 	Orchestrator  Orchestrator  `mapstructure:"orchestrator"`
+	Grafana       Grafana       `mapstructure:"grafana"`
+}
+
+type Grafana struct {
+	URL string `mapstructure:"url" default:"http://localhost:3000/d/flood-test/flood-test?kiosk"`
 }
 
 type Queue struct {
@@ -113,6 +118,7 @@ func Load() (Config, error) {
 	_ = viper.BindEnv("orchestrator.rate")
 	_ = viper.BindEnv("orchestrator.burst")
 	_ = viper.BindEnv("orchestrator.workers")
+	_ = viper.BindEnv("grafana.url")
 
 	if err := viper.Unmarshal(&cfg); err != nil {
 		return Config{}, err

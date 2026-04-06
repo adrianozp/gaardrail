@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Gaardrail</title>
+  <link rel="icon" type="image/x-icon" href="/favicon/favicon.ico">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon/favicon-16x16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png">
+  <link rel="manifest" href="/favicon/site.webmanifest">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: monospace;
+      background: #0d1117;
+      color: #e6edf3;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #bar {
+      background: #161b22;
+      border-bottom: 2px solid #30363d;
+      padding: 0 16px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+      transition: border-color 0.3s;
+    }
+    #bar.editing { border-color: #58a6ff; }
+    #bar.success { border-color: #238636; }
+    #bar.error   { border-color: #da3633; }
+
+    .brand {
+      color: #58a6ff;
+      font-weight: bold;
+      font-size: 14px;
+      letter-spacing: 1px;
+      white-space: nowrap;
+    }
+
+    .divider { color: #30363d; }
+
+    #params {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .param {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .param label {
+      color: #8b949e;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .param .value {
+      color: #e6edf3;
+      font-size: 26px;
+    }
+
+    .param input[type="number"] {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 3px;
+      padding: 3px 6px;
+      color: #e6edf3;
+      font-family: monospace;
+      font-size: 12px;
+      width: 70px;
+      outline: none;
+    }
+    .param input[type="number"]:focus { border-color: #58a6ff; }
+
+    #actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    #error-msg {
+      color: #da3633;
+      font-size: 11px;
+      display: none;
+    }
+
+    button {
+      font-family: monospace;
+      cursor: pointer;
+      border-radius: 4px;
+      padding: 4px 12px;
+      font-size: 12px;
+    }
+
+    #btn-edit {
+      background: transparent;
+      border: 1px solid #30363d;
+      color: #8b949e;
+    }
+    #btn-edit:hover { border-color: #58a6ff; color: #58a6ff; }
+
+    #btn-cancel {
+      background: transparent;
+      border: 1px solid #30363d;
+      color: #8b949e;
+    }
+    #btn-cancel:hover { color: #e6edf3; }
+
+    #btn-save {
+      background: #238636;
+      border: none;
+      color: #fff;
+    }
+    #btn-save:hover { background: #2ea043; }
+
+    #grafana {
+      flex: 1;
+      overflow: hidden;
+    }
+
+    #grafana iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="bar">
+    <span class="brand">GAARDRAIL</span>
+    <span class="divider">|</span>
+    <div id="params"></div>
+    <div id="actions">
+      <span id="error-msg"></span>
+      <button id="btn-cancel" onclick="cancelEdit()"  style="display:none">✕ Cancelar</button>
+      <button id="btn-save"   onclick="saveParams()"  style="display:none">✓ Salvar</button>
+    </div>
+  </div>
+  <div id="grafana">
+    <iframe src="{{GRAFANA_URL}}" title="Grafana Dashboard"></iframe>
+  </div>
+
+  <script>
+    const FIELDS = ['setpoint', 'kp', 'ki', 'kd', 'min', 'max', 'i_clamp'];
+    let current = {};
+    let successTimer = null;
+    let editing = false;
+
+    async function loadParams() {
+      try {
+        const res = await fetch('/pid');
+        if (!res.ok) throw new Error(res.statusText);
+        current = await res.json();
+        renderView();
+      } catch (_) {
+        renderError();
+      }
+    }
+
+    function renderView() {
+      document.getElementById('params').innerHTML = FIELDS.map(f => `
+        <div class="param">
+          <label>${f}</label>
+          <span class="value">${current[f] !== undefined ? current[f] : '—'}</span>
+        </div>
+      `).join('') + `<button onclick="enterEdit()" style="background:transparent;border:1px solid #30363d;border-radius:4px;padding:4px 12px;color:#8b949e;font-family:monospace;font-size:12px;cursor:pointer;margin-left:4px">✏ Editar</button>`;
+      hide('btn-cancel');
+      hide('btn-save');
+      setBarClass('');
+      editing = false;
+    }
+
+    function renderError() {
+      document.getElementById('params').innerHTML = `
+        <span style="color:#da3633;font-size:12px">Erro ao carregar parâmetros</span>
+        <button onclick="loadParams()"
+          style="background:transparent;border:1px solid #30363d;color:#8b949e;
+                 padding:2px 8px;font-size:11px;border-radius:3px;cursor:pointer;margin-left:8px">
+          ↺ Tentar novamente
+        </button>
+      `;
+      hide('btn-cancel');
+      hide('btn-save');
+      editing = false;
+    }
+
+    function enterEdit() {
+      clearTimeout(successTimer);
+      document.getElementById('params').innerHTML = FIELDS.map(f => `
+        <div class="param">
+          <label>${f}</label>
+          <input type="number" step="any" id="input-${f}" value="${current[f] !== undefined ? current[f] : 0}">
+        </div>
+      `).join('');
+      show('btn-cancel');
+      show('btn-save');
+      setBarClass('editing');
+      editing = true;
+    }
+
+    function cancelEdit() {
+      renderView();
+    }
+
+    async function saveParams() {
+      const body = {};
+      for (const f of FIELDS) {
+        const input = document.getElementById(`input-${f}`);
+        const val = parseFloat(input.value);
+        if (isNaN(val)) continue;
+        if (val !== current[f]) body[f] = val;
+      }
+
+      if (Object.keys(body).length === 0) {
+        renderView();
+        return;
+      }
+
+      try {
+        const res = await fetch('/pid', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          showFeedback('error', data.error || `Erro ${res.status}`);
+          return;
+        }
+
+        showFeedback('success', null);
+        successTimer = setTimeout(loadParams, 2000);
+      } catch (_) {
+        showFeedback('error', 'Erro de rede');
+      }
+    }
+
+    function showFeedback(type, msg) {
+      setBarClass(type);
+      const el = document.getElementById('error-msg');
+      if (msg) {
+        el.textContent = msg;
+        el.style.display = '';
+        setTimeout(() => { el.style.display = 'none'; }, 3000);
+      }
+      if (type === 'error') {
+        setTimeout(() => setBarClass('editing'), 2000);
+      }
+    }
+
+    function setBarClass(cls) {
+      document.getElementById('bar').className = cls;
+    }
+
+    function show(id) { document.getElementById(id).style.display = ''; }
+    function hide(id) { document.getElementById(id).style.display = 'none'; }
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && editing) saveParams();
+    });
+
+    loadParams();
+  </script>
+</body>
+</html>

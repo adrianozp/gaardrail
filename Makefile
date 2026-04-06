@@ -1,17 +1,8 @@
-infra/up:
-	docker compose up -d mysql mysqld-exporter prometheus
-
-infra/down:
-	docker compose down mysql mysqld-exporter prometheus
-
 kafka/up:
 	docker compose up -d kafka
 
 kafka/down:
 	docker compose down kafka
-
-run:
-	go run ./cmd/api
 
 kafka/setup:
 	docker compose exec kafka /opt/kafka/bin/kafka-topics.sh \
@@ -21,3 +12,15 @@ kafka/setup:
 		--topic messages \
 		--partitions 1 \
 		--replication-factor 1
+
+flood/up:
+	docker compose -f flood-test/docker-compose-flood.yml up -d
+
+flood/setup:
+	./flood-test/scripts/setup-db.sh 1
+
+flood/messages:
+	./flood-test/scripts/flood.sh 10000
+
+run:
+	go run ./cmd/api

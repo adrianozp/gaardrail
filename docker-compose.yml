@@ -1,36 +1,4 @@
 services:
-  mysql:
-    image: mysql:8.0
-    ports:
-      - "3306:3306"
-    environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: gaardrail
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  mysqld-exporter:
-    image: prom/mysqld-exporter:latest
-    ports:
-      - "9104:9104"
-    environment:
-      DATA_SOURCE_NAME: "root:root@(mysql:3306)/"
-    depends_on:
-      mysql:
-        condition: service_healthy
-
-  prometheus:
-    image: prom/prometheus:latest
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
-    depends_on:
-      - mysqld-exporter
-
   kafka:
     image: apache/kafka:latest
     ports:

@@ -16,6 +16,9 @@ kafka/setup:
 flood/up:
 	docker compose -f flood-test/docker-compose-flood.yml up -d
 
+flood/down:
+	docker compose -f flood-test/docker-compose-flood.yml down
+
 flood/setup:
 	./flood-test/scripts/setup-db.sh 1
 

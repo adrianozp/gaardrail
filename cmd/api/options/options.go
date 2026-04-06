@@ -40,7 +40,11 @@ func Options() fx.Option {
 			router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 			lc.Append(fx.Hook{
 				OnStart: func(ctx context.Context) error {
-					go router.Run(cfg.HTTP.Addr)
+					if cfg.HTTP.TLSEnabled() {
+						go router.RunTLS(cfg.HTTP.Addr, cfg.HTTP.CertFile, cfg.HTTP.KeyFile)
+					} else {
+						go router.Run(cfg.HTTP.Addr)
+					}
 					return nil
 				},
 			})

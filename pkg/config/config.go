@@ -31,7 +31,13 @@ type Queue struct {
 }
 
 type HTTP struct {
-	Addr string `mapstructure:"addr" default:":8080"`
+	Addr     string `mapstructure:"addr"      default:":8080"`
+	CertFile string `mapstructure:"cert_file"`
+	KeyFile  string `mapstructure:"key_file"`
+}
+
+func (h HTTP) TLSEnabled() bool {
+	return h.CertFile != "" && h.KeyFile != ""
 }
 
 type Kafka struct {
@@ -93,6 +99,8 @@ func Load() (Config, error) {
 	viper.AutomaticEnv()
 
 	_ = viper.BindEnv("http.addr")
+	_ = viper.BindEnv("http.cert_file")
+	_ = viper.BindEnv("http.key_file")
 	_ = viper.BindEnv("queue.protocol")
 	_ = viper.BindEnv("queue.capacity")
 	_ = viper.BindEnv("kafka.brokers")

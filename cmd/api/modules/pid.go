@@ -1,30 +1,28 @@
 package modules
 
 import (
-	updatepidparamshandler "github.com/adrianozp/gaardrail/app/handlers/updatepidparams"
-	"github.com/adrianozp/gaardrail/app/usecases/updatepidparams"
+	pidparamshandler "github.com/adrianozp/gaardrail/app/handlers/pidparams"
+	"github.com/adrianozp/gaardrail/app/usecases/pidparams"
 	"github.com/adrianozp/gaardrail/internal/controller"
 	"go.uber.org/fx"
 )
 
 func PIDFactories() fx.Option {
 	return fx.Provide(
-		updatepidparams.New,
-		updatepidparamshandler.NewUpdatePIDParamsHandler,
+		pidparams.New,
+		pidparamshandler.New,
 	)
 }
 
 func PIDInjections() fx.Option {
 	return fx.Provide(
-		func(c *controller.Controller) updatepidparams.ParamUpdater { return c },
-		func(uc updatepidparams.UpdatePIDParamsUseCase) updatepidparamshandler.UpdatePIDParamsUseCase {
-			return uc
-		},
+		func(c *controller.Controller) pidparams.Controller { return c },
+		func(uc pidparams.UseCase) pidparamshandler.PIDParamsUseCase { return uc },
 	)
 }
 
 func PIDEndpoints() fx.Option {
 	return fx.Module("pid",
-		fx.Invoke(updatepidparamshandler.RegisterUpdatePIDParamsRoutes),
+		fx.Invoke(pidparamshandler.RegisterRoutes),
 	)
 }

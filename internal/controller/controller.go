@@ -113,6 +113,25 @@ func (c *Controller) Compute(measured float64, measureTime time.Time) (float64, 
 	return output, nil
 }
 
+// GetParams returns a snapshot of the current PID parameters.
+func (c *Controller) GetParams() entities.PIDParams {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	kp, ki, kd := c.Kp, c.Ki, c.Kd
+	min, max, iclamp, setpoint := c.Min, c.Max, c.IClamp, c.setpoint
+
+	return entities.PIDParams{
+		Kp:       &kp,
+		Ki:       &ki,
+		Kd:       &kd,
+		Min:      &min,
+		Max:      &max,
+		IClamp:   &iclamp,
+		Setpoint: &setpoint,
+	}
+}
+
 // SetParams updates PID parameters at runtime. Only non-nil fields are updated.
 // Resets integral accumulator to avoid windup from previous gains.
 func (c *Controller) SetParams(p entities.PIDParams) error {

@@ -35,6 +35,7 @@ func NewConsumeMessageUseCase(q Queue, t Target) ConsumeMessageUseCase {
 func (u ConsumeMessageUseCase) Consume() (string, error) {
 	consumeStartTime := clock.Now()
 	message, err := u.queue.Dequeue()
+	metrics.Gauge(map[string]float64{"dequeue_time_seconds": clock.Now().Sub(consumeStartTime).Seconds()})
 	if err != nil {
 		log.Error().Msg("error dequeing message")
 		return "", err

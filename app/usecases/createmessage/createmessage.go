@@ -2,6 +2,8 @@ package createmessage
 
 import (
 	"github.com/adrianozp/gaardrail/app/entities"
+	metrics "github.com/adrianozp/gaardrail/internal/metrics"
+	"github.com/adrianozp/gaardrail/pkg/clock"
 	"github.com/adrianozp/gaardrail/pkg/uuid"
 	"github.com/rs/zerolog/log"
 )
@@ -24,7 +26,9 @@ func NewCreateMessageUseCase(q Queue) CreateMessageUseCase {
 
 func (u CreateMessageUseCase) Create(m entities.Message) (string, error) {
 	m.ID = uuid.New()
+	enqueueStart := clock.Now()
 	id, err := u.queue.Enqueue(m)
+	metrics.Gauge(map[string]float64{"enqueue_time_seconds": clock.Now().Sub(enqueueStart).Seconds()})
 	if err != nil {
 		return "", err
 	}

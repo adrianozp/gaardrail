@@ -86,6 +86,7 @@ paths:
                 max: 100.0
                 i_clamp: 10.0
                 setpoint: 50.0
+                filter_size: 1
 
     patch:
       summary: Atualiza parcialmente os parâmetros do controlador PID
@@ -100,6 +101,7 @@ paths:
             example:
               kp: 1.2
               setpoint: 60.0
+              filter_size: 5
       responses:
         "204":
           description: Parâmetros atualizados com sucesso
@@ -164,6 +166,10 @@ components:
           type: number
           format: double
           description: Valor alvo para o controlador
+        filter_size:
+          type: integer
+          minimum: 1
+          description: Tamanho da janela do filtro de média móvel (1 = sem filtro)
 
     UpdatePIDParamsRequest:
       type: object
@@ -190,6 +196,10 @@ components:
         setpoint:
           type: number
           format: double
+        filter_size:
+          type: integer
+          minimum: 1
+          description: Tamanho da janela do filtro de média móvel (1 = sem filtro)
 
     ErrorResponse:
       type: object

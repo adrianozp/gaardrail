@@ -15,11 +15,12 @@ type Metrics struct {
 }
 
 type PIDParams struct {
-	Kp       *float64
-	Ki       *float64
-	Kd       *float64
-	Min      *float64
-	Max      *float64
-	IClamp   *float64
-	Setpoint *float64
+	Kp         *float64
+	Ki         *float64
+	Kd         *float64
+	Min        *float64
+	Max        *float64
+	IClamp     *float64
+	Setpoint   *float64
+	FilterSize *int
 }

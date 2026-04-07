@@ -247,7 +247,8 @@
   </div>
 
   <script>
-    const FIELDS = ['setpoint', 'kp', 'ki', 'kd', 'min', 'max', 'i_clamp'];
+    const FIELDS = ['setpoint', 'kp', 'ki', 'kd', 'min', 'max', 'i_clamp', 'filter_size'];
+    const INT_FIELDS = new Set(['filter_size']);
     let current = {};
     let successTimer = null;
     let editing = false;
@@ -295,7 +296,7 @@
       document.getElementById('params').innerHTML = FIELDS.map(f => `
         <div class="param">
           <label>${f}</label>
-          <input type="number" step="any" id="input-${f}" value="${current[f] !== undefined ? current[f] : 0}">
+          <input type="number" step="${INT_FIELDS.has(f) ? '1' : 'any'}" ${INT_FIELDS.has(f) ? 'min="1"' : ''} id="input-${f}" value="${current[f] !== undefined ? current[f] : 0}">
         </div>
       `).join('');
       show('btn-cancel');
@@ -312,7 +313,7 @@
       const body = {};
       for (const f of FIELDS) {
         const input = document.getElementById(`input-${f}`);
-        const val = parseFloat(input.value);
+        const val = INT_FIELDS.has(f) ? parseInt(input.value, 10) : parseFloat(input.value);
         if (isNaN(val)) continue;
         if (val !== current[f]) body[f] = val;
       }

@@ -30,6 +30,7 @@ type Controller struct {
 	first       bool
 	lastCompute time.Time
 	filter      *MovingAverage
+	filterSize  int
 }
 
 type ControllerParams struct {
@@ -55,15 +56,16 @@ func New(cfg config.Config) *Controller {
 		filterSize = 1
 	}
 	return &Controller{
-		Kp:       cfg.PID.Kp,
-		Ki:       cfg.PID.Ki,
-		Kd:       cfg.PID.Kd,
-		Min:      cfg.PID.Min,
-		Max:      cfg.PID.Max,
-		IClamp:   cfg.PID.IClamp,
-		first:    true,
-		setpoint: cfg.PID.Setpoint,
-		filter:   NewMovingAverage(filterSize),
+		Kp:         cfg.PID.Kp,
+		Ki:         cfg.PID.Ki,
+		Kd:         cfg.PID.Kd,
+		Min:        cfg.PID.Min,
+		Max:        cfg.PID.Max,
+		IClamp:     cfg.PID.IClamp,
+		first:      true,
+		setpoint:   cfg.PID.Setpoint,
+		filter:     NewMovingAverage(filterSize),
+		filterSize: filterSize,
 	}
 }
 
@@ -127,15 +129,17 @@ func (c *Controller) GetParams() entities.PIDParams {
 
 	kp, ki, kd := c.Kp, c.Ki, c.Kd
 	min, max, iclamp, setpoint := c.Min, c.Max, c.IClamp, c.setpoint
+	filterSize := c.filterSize
 
 	return entities.PIDParams{
-		Kp:       &kp,
-		Ki:       &ki,
-		Kd:       &kd,
-		Min:      &min,
-		Max:      &max,
-		IClamp:   &iclamp,
-		Setpoint: &setpoint,
+		Kp:         &kp,
+		Ki:         &ki,
+		Kd:         &kd,
+		Min:        &min,
+		Max:        &max,
+		IClamp:     &iclamp,
+		Setpoint:   &setpoint,
+		FilterSize: &filterSize,
 	}
 }
 
@@ -165,6 +169,10 @@ func (c *Controller) SetParams(p entities.PIDParams) error {
 	}
 	if p.Setpoint != nil {
 		c.setpoint = *p.Setpoint
+	}
+	if p.FilterSize != nil && *p.FilterSize >= 1 {
+		c.filterSize = *p.FilterSize
+		c.filter = NewMovingAverage(c.filterSize)
 	}
 
 	if c.Min > c.Max {

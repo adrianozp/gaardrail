@@ -68,6 +68,8 @@ output(t) = clamp(P + I + D,  Min,  Max)
 
 The output is the new **drain rate** in messages/second, clamped to `[Min, Max]`.
 
+Before the measured value reaches the PID, it passes through a **moving average filter** of configurable size (`filter_size`). A size of `1` disables filtering (pass-through). Larger values smooth out noisy metrics at the cost of additional lag.
+
 | Parameter | Role |
 |-----------|------|
 | `Kp` | Proportional gain — immediate response to error |
@@ -76,10 +78,15 @@ The output is the new **drain rate** in messages/second, clamped to `[Min, Max]`
 | `IClamp` | Anti-windup bound on the integral accumulator |
 | `setpoint` | Target resource utilization (e.g. `50.0` for 50% CPU) |
 | `Min / Max` | Output clamp — drain rate bounds in msgs/s |
+| `filter_size` | Moving average window size (`1` = no filter) |
 
-Parameters can be updated at runtime without restarting:
+Parameters can be read and updated at runtime without restarting:
 
 ```bash
+# read current parameters
+curl http://localhost:8080/pid
+
+# update one or more parameters (only present fields are changed)
 curl -X PATCH http://localhost:8080/pid \
   -H "Content-Type: application/json" \
   -d '{"kp": 0.15, "setpoint": 55.0}'
@@ -152,6 +159,7 @@ pid:
   min: 0.0         # minimum drain rate (msgs/s)
   max: 10.0        # maximum drain rate (msgs/s)
   i_clamp: 5.0     # integral anti-windup bound
+  filter_size: 1   # moving average window (1 = no filter)
 
 orchestrator:
   workers: 1       # parallel consumer goroutines
@@ -247,17 +255,19 @@ curl -X PATCH http://localhost:8080/pid \
     "kd": 0.02,
     "min": 0.0,
     "max": 10.0,
-    "i_clamp": 5.0
+    "i_clamp": 5.0,
+    "filter_size": 1
   }'
 ```
 
-| Field | Description |
-|-------|-------------|
-| `setpoint` | Target CPU % |
-| `kp` | Proportional gain |
-| `ki` | Integral gain |
-| `kd` | Derivative gain |
-| `min` | Minimum drain rate (msgs/s) |
-| `max` | Maximum drain rate (msgs/s) |
-| `i_clamp` | Anti-windup bound on the integral accumulator |
+| Field | Type | Description |
+|-------|------|-------------|
+| `setpoint` | float | Target CPU % |
+| `kp` | float | Proportional gain |
+| `ki` | float | Integral gain |
+| `kd` | float | Derivative gain |
+| `min` | float | Minimum drain rate (msgs/s) |
+| `max` | float | Maximum drain rate (msgs/s) |
+| `i_clamp` | float | Anti-windup bound on the integral accumulator |
+| `filter_size` | int | Moving average window size (`1` = no filter, `>= 1`) |
 

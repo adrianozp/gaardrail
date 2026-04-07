@@ -1,9 +1,11 @@
 package consumemessage
 
 import (
+	"time"
+
 	"github.com/adrianozp/gaardrail/app/entities"
+	metrics "github.com/adrianozp/gaardrail/internal/metrics"
 	"github.com/adrianozp/gaardrail/pkg/clock"
-	"github.com/adrianozp/gaardrail/pkg/metrics"
 	"github.com/rs/zerolog/log"
 )
 
@@ -50,15 +52,20 @@ func (u ConsumeMessageUseCase) Consume() (string, error) {
 		return "", err
 	}
 
+	sendMetrics(consumeStartTime, message)
+
+	return message.ID, nil
+}
+
+func sendMetrics(consumeStartTime time.Time, message entities.Message) {
 	consumeTime := clock.Now().Sub(consumeStartTime).Seconds()
 	processTime := clock.Now().Sub(message.CreatedAt).Seconds()
-	log.Info().Str("message_id", message.ID).Float64("consume_time", consumeTime).Float64("process_time", processTime).Msg("consumed message")
+	log.Debug().Str("message_id", message.ID).Float64("consume_time", consumeTime).Float64("process_time", processTime).Msg("consumed message")
 	metrics.Incr([]string{"messages_processed_total"})
 	metrics.Gauge(map[string]float64{
 		"consume_time_seconds": consumeTime,
 		"process_time_seconds": processTime,
 	})
-	return message.ID, nil
 }
 
 func (u ConsumeMessageUseCase) Size() (int64, error) {

@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
+	metrics "github.com/adrianozp/gaardrail/internal/metrics"
 	"github.com/adrianozp/gaardrail/pkg/config"
-	"github.com/adrianozp/gaardrail/pkg/metrics"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/time/rate"
 )
@@ -84,7 +84,7 @@ func (o *Orchestrator) worker() {
 }
 
 func (o *Orchestrator) lagPoller() {
-	t := time.NewTicker(2 * time.Second)
+	t := time.NewTicker(5 * time.Second)
 	defer t.Stop()
 	for {
 		select {

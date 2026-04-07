@@ -19,6 +19,8 @@ func Options() fx.Option {
 			httpserver.New,
 		),
 
+		modules.MetricsLifecycle(),
+
 		modules.QueueFactories(),
 
 		modules.OrchestratorFactories(),

@@ -8,7 +8,7 @@ import (
 
 	"github.com/adrianozp/gaardrail/app/entities"
 	"github.com/adrianozp/gaardrail/pkg/config"
-	"github.com/adrianozp/gaardrail/pkg/metrics"
+	metrics "github.com/adrianozp/gaardrail/internal/metrics"
 )
 
 // Controller is a discrete PID controller in position form.
@@ -29,6 +29,7 @@ type Controller struct {
 	prevE       float64
 	first       bool
 	lastCompute time.Time
+	filter      *MovingAverage
 }
 
 type ControllerParams struct {
@@ -49,6 +50,10 @@ func New(cfg config.Config) *Controller {
 	if cfg.PID.IClamp < 0 {
 		panic("pid.New: iClamp must be >= 0")
 	}
+	filterSize := cfg.PID.FilterSize
+	if filterSize < 1 {
+		filterSize = 1
+	}
 	return &Controller{
 		Kp:       cfg.PID.Kp,
 		Ki:       cfg.PID.Ki,
@@ -58,6 +63,7 @@ func New(cfg config.Config) *Controller {
 		IClamp:   cfg.PID.IClamp,
 		first:    true,
 		setpoint: cfg.PID.Setpoint,
+		filter:   NewMovingAverage(filterSize),
 	}
 }
 
@@ -80,6 +86,7 @@ func (c *Controller) Compute(measured float64, measureTime time.Time) (float64, 
 		return 0, err
 	}
 
+	measured = c.filter.Filter(measured)
 	e := c.setpoint - measured
 
 	p := c.Kp * e

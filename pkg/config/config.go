@@ -64,13 +64,14 @@ type MetricsPoller struct {
 }
 
 type PID struct {
-	Kp       float64 `mapstructure:"kp"        default:"1.0"`
-	Ki       float64 `mapstructure:"ki"        default:"0.1"`
-	Kd       float64 `mapstructure:"kd"        default:"0.01"`
-	Min      float64 `mapstructure:"min"       default:"1.0"`
-	Max      float64 `mapstructure:"max"       default:"100.0"`
-	IClamp   float64 `mapstructure:"i_clamp"   default:"100.0"`
-	Setpoint float64 `mapstructure:"setpoint"  default:"70.0"`
+	Kp         float64 `mapstructure:"kp"          default:"1.0"`
+	Ki         float64 `mapstructure:"ki"          default:"0.1"`
+	Kd         float64 `mapstructure:"kd"          default:"0.01"`
+	Min        float64 `mapstructure:"min"         default:"1.0"`
+	Max        float64 `mapstructure:"max"         default:"100.0"`
+	IClamp     float64 `mapstructure:"i_clamp"     default:"100.0"`
+	Setpoint   float64 `mapstructure:"setpoint"    default:"70.0"`
+	FilterSize int     `mapstructure:"filter_size" default:"1"`
 }
 
 type Orchestrator struct {
@@ -123,6 +124,7 @@ func Load() (Config, error) {
 	_ = viper.BindEnv("pid.max")
 	_ = viper.BindEnv("pid.i_clamp")
 	_ = viper.BindEnv("pid.setpoint")
+	_ = viper.BindEnv("pid.filter_size")
 	_ = viper.BindEnv("orchestrator.rate")
 	_ = viper.BindEnv("orchestrator.burst")
 	_ = viper.BindEnv("orchestrator.workers")

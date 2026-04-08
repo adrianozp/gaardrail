@@ -6,12 +6,13 @@ import (
 )
 
 type Client struct {
-	client   sarama.Client
-	consumer sarama.PartitionConsumer
-	producer sarama.SyncProducer
-	manager  sarama.OffsetManager
-	pom      sarama.PartitionOffsetManager
-	topic    string
+	client    sarama.Client
+	consumer  sarama.PartitionConsumer
+	producer  sarama.SyncProducer
+	manager   sarama.OffsetManager
+	pom       sarama.PartitionOffsetManager
+	topic     string
+	partition int32
 }
 
 func New(cfg config.Config) (*Client, error) {
@@ -81,12 +82,13 @@ func New(cfg config.Config) (*Client, error) {
 	}
 
 	return &Client{
-		client:   client,
-		consumer: pc,
-		producer: producer,
-		manager:  manager,
-		pom:      pom,
-		topic:    cfg.Kafka.Topic,
+		client:    client,
+		consumer:  pc,
+		producer:  producer,
+		manager:   manager,
+		pom:       pom,
+		topic:     cfg.Kafka.Topic,
+		partition: cfg.Kafka.Partition,
 	}, nil
 }
 
@@ -129,7 +131,10 @@ func (c *Client) MarkOffset(msg *sarama.ConsumerMessage) {
 }
 
 func (c *Client) Size() (int64, error) {
-	newest := c.consumer.HighWaterMarkOffset()
+	newest, err := c.client.GetOffset(c.topic, c.partition, sarama.OffsetNewest)
+	if err != nil {
+		return 0, err
+	}
 	offset, _ := c.pom.NextOffset()
 	lag := newest - offset
 	if lag < 0 {

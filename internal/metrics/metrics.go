@@ -1,6 +1,9 @@
 package metrics
 
-import "github.com/adrianozp/gaardrail/internal/metrics/noop"
+import (
+	"github.com/adrianozp/gaardrail/internal/metrics/noop"
+	"github.com/rs/zerolog/log"
+)
 
 // Recorder is the metrics abstraction. Implementations must be safe for
 // concurrent use. Gauge and Incr must never block.
@@ -18,7 +21,12 @@ var global Recorder = noop.Recorder{}
 func SetRecorder(r Recorder) { global = r }
 
 // Gauge sets one or more named gauge metrics on the global recorder.
-func Gauge(values map[string]float64) { global.Gauge(values) }
+func Gauge(values map[string]float64) {
+	log.Info().Fields(map[string]any{"values": values}).Msg("metrics: gauge")
+	global.Gauge(values)
+}
 
 // Incr increments one or more named counter metrics by 1 on the global recorder.
-func Incr(names []string) { global.Incr(names) }
+func Incr(names []string) {
+	global.Incr(names)
+}

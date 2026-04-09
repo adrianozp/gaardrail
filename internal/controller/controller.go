@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/adrianozp/gaardrail/app/entities"
-	"github.com/adrianozp/gaardrail/pkg/config"
 	metrics "github.com/adrianozp/gaardrail/internal/metrics"
+	"github.com/adrianozp/gaardrail/pkg/config"
 )
 
 // Controller is a discrete PID controller in position form.
@@ -29,8 +29,6 @@ type Controller struct {
 	prevE       float64
 	first       bool
 	lastCompute time.Time
-	filter      *MovingAverage
-	filterSize  int
 }
 
 type ControllerParams struct {
@@ -51,21 +49,15 @@ func New(cfg config.Config) *Controller {
 	if cfg.PID.IClamp < 0 {
 		panic("pid.New: iClamp must be >= 0")
 	}
-	filterSize := cfg.PID.FilterSize
-	if filterSize < 1 {
-		filterSize = 1
-	}
 	return &Controller{
-		Kp:         cfg.PID.Kp,
-		Ki:         cfg.PID.Ki,
-		Kd:         cfg.PID.Kd,
-		Min:        cfg.PID.Min,
-		Max:        cfg.PID.Max,
-		IClamp:     cfg.PID.IClamp,
-		first:      true,
-		setpoint:   cfg.PID.Setpoint,
-		filter:     NewMovingAverage(filterSize),
-		filterSize: filterSize,
+		Kp:       cfg.PID.Kp,
+		Ki:       cfg.PID.Ki,
+		Kd:       cfg.PID.Kd,
+		Min:      cfg.PID.Min,
+		Max:      cfg.PID.Max,
+		IClamp:   cfg.PID.IClamp,
+		first:    true,
+		setpoint: cfg.PID.Setpoint,
 	}
 }
 
@@ -88,7 +80,6 @@ func (c *Controller) Compute(measured float64, measureTime time.Time) (float64, 
 		return 0, err
 	}
 
-	measured = c.filter.Filter(measured)
 	e := c.setpoint - measured
 
 	p := c.Kp * e
@@ -129,17 +120,15 @@ func (c *Controller) GetParams() entities.PIDParams {
 
 	kp, ki, kd := c.Kp, c.Ki, c.Kd
 	min, max, iclamp, setpoint := c.Min, c.Max, c.IClamp, c.setpoint
-	filterSize := c.filterSize
 
 	return entities.PIDParams{
-		Kp:         &kp,
-		Ki:         &ki,
-		Kd:         &kd,
-		Min:        &min,
-		Max:        &max,
-		IClamp:     &iclamp,
-		Setpoint:   &setpoint,
-		FilterSize: &filterSize,
+		Kp:       &kp,
+		Ki:       &ki,
+		Kd:       &kd,
+		Min:      &min,
+		Max:      &max,
+		IClamp:   &iclamp,
+		Setpoint: &setpoint,
 	}
 }
 
@@ -169,10 +158,6 @@ func (c *Controller) SetParams(p entities.PIDParams) error {
 	}
 	if p.Setpoint != nil {
 		c.setpoint = *p.Setpoint
-	}
-	if p.FilterSize != nil && *p.FilterSize >= 1 {
-		c.filterSize = *p.FilterSize
-		c.filter = NewMovingAverage(c.filterSize)
 	}
 
 	if c.Min > c.Max {

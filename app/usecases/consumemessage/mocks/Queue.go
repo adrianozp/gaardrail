@@ -3,6 +3,8 @@
 package mocks
 
 import (
+	context "context"
+
 	entities "github.com/adrianozp/gaardrail/app/entities"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -12,17 +14,17 @@ type Queue struct {
 	mock.Mock
 }
 
-// Ack provides a mock function with given fields: _a0
-func (_m *Queue) Ack(_a0 entities.Message) error {
-	ret := _m.Called(_a0)
+// Ack provides a mock function with given fields: _a0, _a1
+func (_m *Queue) Ack(_a0 context.Context, _a1 entities.Message) error {
+	ret := _m.Called(_a0, _a1)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Ack")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(entities.Message) error); ok {
-		r0 = rf(_a0)
+	if rf, ok := ret.Get(0).(func(context.Context, entities.Message) error); ok {
+		r0 = rf(_a0, _a1)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -30,9 +32,9 @@ func (_m *Queue) Ack(_a0 entities.Message) error {
 	return r0
 }
 
-// Dequeue provides a mock function with no fields
-func (_m *Queue) Dequeue() (entities.Message, error) {
-	ret := _m.Called()
+// Dequeue provides a mock function with given fields: _a0
+func (_m *Queue) Dequeue(_a0 context.Context) (entities.Message, error) {
+	ret := _m.Called(_a0)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Dequeue")
@@ -40,17 +42,17 @@ func (_m *Queue) Dequeue() (entities.Message, error) {
 
 	var r0 entities.Message
 	var r1 error
-	if rf, ok := ret.Get(0).(func() (entities.Message, error)); ok {
-		return rf()
+	if rf, ok := ret.Get(0).(func(context.Context) (entities.Message, error)); ok {
+		return rf(_a0)
 	}
-	if rf, ok := ret.Get(0).(func() entities.Message); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(context.Context) entities.Message); ok {
+		r0 = rf(_a0)
 	} else {
 		r0 = ret.Get(0).(entities.Message)
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(_a0)
 	} else {
 		r1 = ret.Error(1)
 	}

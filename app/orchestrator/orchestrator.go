@@ -12,7 +12,7 @@ import (
 
 //go:generate mockery --all --output=mocks --outpkg=mocks
 type Consumer interface {
-	Consume() (string, error)
+	Consume(context.Context) (string, error)
 	Size() (int64, error)
 }
 
@@ -72,12 +72,12 @@ func (o *Orchestrator) worker() {
 			continue
 		}
 
-		if err := o.limiter.Wait(context.Background()); err != nil {
+		if err := o.limiter.Wait(o.ctx); err != nil {
 			log.Warn().Err(err).Msg("orchestrator: rate limiter error, retrying")
 			continue
 		}
 
-		if _, err := o.consumer.Consume(); err != nil {
+		if _, err := o.consumer.Consume(o.ctx); err != nil {
 			log.Error().Err(err).Msg("orchestrator: error consuming message")
 		}
 	}

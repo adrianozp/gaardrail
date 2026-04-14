@@ -1,6 +1,7 @@
 package consumemessage
 
 import (
+	"context"
 	"time"
 
 	"github.com/adrianozp/gaardrail/app/entities"
@@ -11,13 +12,13 @@ import (
 
 //go:generate mockery --all --output=mocks --outpkg=mocks
 type Queue interface {
-	Dequeue() (entities.Message, error)
-	Ack(entities.Message) error
+	Dequeue(context.Context) (entities.Message, error)
+	Ack(context.Context, entities.Message) error
 	Size() (int64, error)
 }
 
 type Target interface {
-	Push(entities.Message) error
+	Push(context.Context, entities.Message) error
 }
 
 type ConsumeMessageUseCase struct {
@@ -32,22 +33,22 @@ func NewConsumeMessageUseCase(q Queue, t Target) ConsumeMessageUseCase {
 	}
 }
 
-func (u ConsumeMessageUseCase) Consume() (string, error) {
+func (u ConsumeMessageUseCase) Consume(ctx context.Context) (string, error) {
 	consumeStartTime := clock.Now()
-	message, err := u.queue.Dequeue()
+	message, err := u.queue.Dequeue(ctx)
 	metrics.Gauge(map[string]float64{"dequeue_time_seconds": clock.Now().Sub(consumeStartTime).Seconds()})
 	if err != nil {
 		log.Error().Msg("error dequeing message")
 		return "", err
 	}
 
-	err = u.target.Push(message)
+	err = u.target.Push(ctx, message)
 	if err != nil {
 		log.Error().Str("message_id", message.ID).Msg("error pushing message")
 		return "", err
 	}
 
-	err = u.queue.Ack(message)
+	err = u.queue.Ack(ctx, message)
 	if err != nil {
 		log.Error().Str("message_id", message.ID).Msg("error consuming message")
 		return "", err

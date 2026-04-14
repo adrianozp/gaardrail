@@ -1,6 +1,7 @@
 package consumemessage_test
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -11,6 +12,7 @@ import (
 	metrics "github.com/adrianozp/gaardrail/internal/metrics"
 	"github.com/adrianozp/gaardrail/pkg/clock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,56 +28,60 @@ func (r *captureRecorder) Gauge(vals map[string]float64) {
 func (r *captureRecorder) Incr([]string) {}
 
 func TestConsume_Success(t *testing.T) {
+	ctx := context.Background()
 	msg := entities.Message{ID: "msg-1"}
 	mockQueue := mocks.NewQueue(t)
 	mockTarget := mocks.NewTarget(t)
-	mockQueue.On("Dequeue").Return(msg, nil)
-	mockTarget.On("Push", msg).Return(nil)
-	mockQueue.On("Ack", msg).Return(nil)
+	mockQueue.On("Dequeue", mock.Anything).Return(msg, nil)
+	mockTarget.On("Push", mock.Anything, msg).Return(nil)
+	mockQueue.On("Ack", mock.Anything, msg).Return(nil)
 
 	uc := consumemessage.NewConsumeMessageUseCase(mockQueue, mockTarget)
-	id, err := uc.Consume()
+	id, err := uc.Consume(ctx)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "msg-1", id)
 }
 
 func TestConsume_DequeueError(t *testing.T) {
+	ctx := context.Background()
 	mockQueue := mocks.NewQueue(t)
 	mockTarget := mocks.NewTarget(t)
-	mockQueue.On("Dequeue").Return(entities.Message{}, errors.New("dequeue failed"))
+	mockQueue.On("Dequeue", mock.Anything).Return(entities.Message{}, errors.New("dequeue failed"))
 
 	uc := consumemessage.NewConsumeMessageUseCase(mockQueue, mockTarget)
-	id, err := uc.Consume()
+	id, err := uc.Consume(ctx)
 
 	assert.EqualError(t, err, "dequeue failed")
 	assert.Empty(t, id)
 }
 
 func TestConsume_PushError(t *testing.T) {
+	ctx := context.Background()
 	msg := entities.Message{ID: "msg-2"}
 	mockQueue := mocks.NewQueue(t)
 	mockTarget := mocks.NewTarget(t)
-	mockQueue.On("Dequeue").Return(msg, nil)
-	mockTarget.On("Push", msg).Return(errors.New("push failed"))
+	mockQueue.On("Dequeue", mock.Anything).Return(msg, nil)
+	mockTarget.On("Push", mock.Anything, msg).Return(errors.New("push failed"))
 
 	uc := consumemessage.NewConsumeMessageUseCase(mockQueue, mockTarget)
-	id, err := uc.Consume()
+	id, err := uc.Consume(ctx)
 
 	assert.EqualError(t, err, "push failed")
 	assert.Empty(t, id)
 }
 
 func TestConsume_AckError(t *testing.T) {
+	ctx := context.Background()
 	msg := entities.Message{ID: "msg-3"}
 	mockQueue := mocks.NewQueue(t)
 	mockTarget := mocks.NewTarget(t)
-	mockQueue.On("Dequeue").Return(msg, nil)
-	mockTarget.On("Push", msg).Return(nil)
-	mockQueue.On("Ack", msg).Return(errors.New("ack failed"))
+	mockQueue.On("Dequeue", mock.Anything).Return(msg, nil)
+	mockTarget.On("Push", mock.Anything, msg).Return(nil)
+	mockQueue.On("Ack", mock.Anything, msg).Return(errors.New("ack failed"))
 
 	uc := consumemessage.NewConsumeMessageUseCase(mockQueue, mockTarget)
-	id, err := uc.Consume()
+	id, err := uc.Consume(ctx)
 
 	assert.EqualError(t, err, "ack failed")
 	assert.Empty(t, id)
@@ -97,19 +103,20 @@ func TestConsume_RecordsDequeueTime(t *testing.T) {
 	})
 	t.Cleanup(func() { clock.With(nil) })
 
+	ctx := context.Background()
 	msg := entities.Message{ID: "msg-1"}
 	mockQueue := mocks.NewQueue(t)
 	mockTarget := mocks.NewTarget(t)
-	mockQueue.On("Dequeue").Return(msg, nil)
-	mockTarget.On("Push", msg).Return(nil)
-	mockQueue.On("Ack", msg).Return(nil)
+	mockQueue.On("Dequeue", mock.Anything).Return(msg, nil)
+	mockTarget.On("Push", mock.Anything, msg).Return(nil)
+	mockQueue.On("Ack", mock.Anything, msg).Return(nil)
 
 	rec := &captureRecorder{gauged: map[string]float64{}}
 	metrics.SetRecorder(rec)
 	t.Cleanup(func() { metrics.SetRecorder(&captureRecorder{gauged: map[string]float64{}}) })
 
 	uc := consumemessage.NewConsumeMessageUseCase(mockQueue, mockTarget)
-	_, err := uc.Consume()
+	_, err := uc.Consume(ctx)
 
 	require.NoError(t, err)
 	assert.Equal(t, 0.2, rec.gauged["dequeue_time_seconds"])

@@ -3,6 +3,8 @@
 package mocks
 
 import (
+	context "context"
+
 	entities "github.com/adrianozp/gaardrail/app/entities"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -12,17 +14,17 @@ type Target struct {
 	mock.Mock
 }
 
-// Push provides a mock function with given fields: _a0
-func (_m *Target) Push(_a0 entities.Message) error {
-	ret := _m.Called(_a0)
+// Push provides a mock function with given fields: _a0, _a1
+func (_m *Target) Push(_a0 context.Context, _a1 entities.Message) error {
+	ret := _m.Called(_a0, _a1)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Push")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(entities.Message) error); ok {
-		r0 = rf(_a0)
+	if rf, ok := ret.Get(0).(func(context.Context, entities.Message) error); ok {
+		r0 = rf(_a0, _a1)
 	} else {
 		r0 = ret.Error(0)
 	}

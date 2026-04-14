@@ -1,6 +1,7 @@
 package targets
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/adrianozp/gaardrail/app/entities"
@@ -12,7 +13,7 @@ import (
 )
 
 type Pusher interface {
-	Push(entities.Message) error
+	Push(context.Context, entities.Message) error
 }
 
 func NewTarget(cfg config.Config) (Pusher, error) {
@@ -37,6 +38,6 @@ func NewTarget(cfg config.Config) (Pusher, error) {
 // noopTarget is used when MetricsPoller.Enabled is false.
 type noopTarget struct{}
 
-func (n *noopTarget) Push(entities.Message) error {
+func (n *noopTarget) Push(_ context.Context, _ entities.Message) error {
 	return nil
 }

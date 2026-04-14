@@ -1,6 +1,7 @@
 package sqlclient
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
@@ -44,8 +45,8 @@ func NewFromDB(db *sql.DB) *Client {
 	return &Client{db: db}
 }
 
-func (c *Client) Exec(query string) error {
-	_, err := c.db.Exec(query)
+func (c *Client) ExecContext(ctx context.Context, query string) error {
+	_, err := c.db.ExecContext(ctx, query)
 	return err
 }
 

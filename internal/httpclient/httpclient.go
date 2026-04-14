@@ -2,6 +2,7 @@ package httpclient
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -24,9 +25,14 @@ func New(cfg Config) *Client {
 }
 
 // FIXME: both functions dont return body and other info
-func (c *Client) Post(path string, body []byte) error {
+func (c *Client) Post(ctx context.Context, path string, body []byte) error {
 	url := c.baseURL + path
-	resp, err := c.http.Post(url, "application/json", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.http.Do(req)
 	if err != nil {
 		return err
 	}

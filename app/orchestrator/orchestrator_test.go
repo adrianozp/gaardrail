@@ -10,10 +10,10 @@ import (
 	"github.com/adrianozp/gaardrail/app/orchestrator/mocks"
 	"github.com/adrianozp/gaardrail/pkg/config"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/time/rate"
 )
-
 
 func defaultCfg() config.Config {
 	return config.Config{Orchestrator: config.Orchestrator{Rate: 100, Burst: 10, Workers: 1}}
@@ -35,7 +35,7 @@ func TestNewOrchestrator_StartsWithDefaultRate(t *testing.T) {
 
 func TestRun_LogsErrorOnConsumeFailure(t *testing.T) {
 	consumer := mocks.NewConsumer(t)
-	consumer.On("Consume").Return("", errors.New("kafka unavailable")).Maybe()
+	consumer.On("Consume", mock.Anything).Return("", errors.New("kafka unavailable")).Maybe()
 	consumer.On("Size").Return(int64(0), nil).Maybe()
 
 	o := orchestrator.NewOrchestrator(consumer, defaultCfg())

@@ -1,6 +1,8 @@
 package http
 
 import (
+	"context"
+
 	"github.com/adrianozp/gaardrail/app/entities"
 	"github.com/adrianozp/gaardrail/internal/httpclient"
 	"github.com/rs/zerolog/log"
@@ -22,7 +24,7 @@ func NewHTTPRepository(client *httpclient.Client, cfg Config) *HTTPRepository {
 	}
 }
 
-func (r *HTTPRepository) Push(m entities.Message) error {
+func (r *HTTPRepository) Push(ctx context.Context, m entities.Message) error {
 	log.Debug().Str("message_id", m.ID).Msg("sent command body")
-	return r.client.Post(r.path, m.Body)
+	return r.client.Post(ctx, r.path, m.Body)
 }

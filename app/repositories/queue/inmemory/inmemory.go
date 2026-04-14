@@ -1,6 +1,7 @@
 package inmemory
 
 import (
+	"context"
 	"sync/atomic"
 
 	"github.com/adrianozp/gaardrail/app/entities"
@@ -23,12 +24,16 @@ func (q *Queue) Enqueue(m entities.Message) (string, error) {
 	return m.ID, nil
 }
 
-func (q *Queue) Dequeue() (entities.Message, error) {
-	m := <-q.ch
-	return m, nil
+func (q *Queue) Dequeue(ctx context.Context) (entities.Message, error) {
+	select {
+	case <-ctx.Done():
+		return entities.Message{}, ctx.Err()
+	case m := <-q.ch:
+		return m, nil
+	}
 }
 
-func (q *Queue) Ack(m entities.Message) error {
+func (q *Queue) Ack(_ context.Context, m entities.Message) error {
 	q.size.Add(-1)
 	return nil
 }

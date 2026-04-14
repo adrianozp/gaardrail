@@ -1,6 +1,7 @@
 package queue
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/adrianozp/gaardrail/app/entities"
@@ -12,8 +13,8 @@ import (
 
 type Queue interface {
 	Enqueue(entities.Message) (string, error)
-	Dequeue() (entities.Message, error)
-	Ack(entities.Message) error
+	Dequeue(context.Context) (entities.Message, error)
+	Ack(context.Context, entities.Message) error
 	Size() (int64, error)
 }
 

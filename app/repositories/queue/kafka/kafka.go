@@ -1,6 +1,7 @@
 package kafka
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/adrianozp/gaardrail/app/entities"
@@ -31,25 +32,28 @@ func (r *KafkaRepository) Enqueue(m entities.Message) (string, error) {
 	return m.ID, nil
 }
 
-func (r *KafkaRepository) Dequeue() (entities.Message, error) {
-	msg := <-r.client.Messages()
-	log.Debug().Msg("kafka: msg dequeued")
+func (r *KafkaRepository) Dequeue(ctx context.Context) (entities.Message, error) {
+	select {
+	case <-ctx.Done():
+		return entities.Message{}, ctx.Err()
+	case msg := <-r.client.Messages():
+		log.Debug().Msg("kafka: msg dequeued")
 
-	var model kafkaMessage
-	err := json.Unmarshal(msg.Value, &model)
-	if err != nil {
-		return entities.Message{}, err
-	}
+		var model kafkaMessage
+		if err := json.Unmarshal(msg.Value, &model); err != nil {
+			return entities.Message{}, err
+		}
 
-	entity := model.ToMessage()
-	entity.Ack = func() error {
-		r.client.MarkOffset(msg)
-		return nil
+		entity := model.ToMessage()
+		entity.Ack = func() error {
+			r.client.MarkOffset(msg)
+			return nil
+		}
+		return entity, nil
 	}
-	return entity, nil
 }
 
-func (r *KafkaRepository) Ack(m entities.Message) error {
+func (r *KafkaRepository) Ack(_ context.Context, m entities.Message) error {
 	if m.Ack != nil {
 		return m.Ack()
 	}

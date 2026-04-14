@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/adrianozp/gaardrail/app/usecases/orchestrator"
-	"github.com/adrianozp/gaardrail/app/usecases/orchestrator/mocks"
+	"github.com/adrianozp/gaardrail/app/orchestrator"
+	"github.com/adrianozp/gaardrail/app/orchestrator/mocks"
 	"github.com/adrianozp/gaardrail/pkg/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

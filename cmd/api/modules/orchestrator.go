@@ -4,7 +4,7 @@ import (
 	queuerepo "github.com/adrianozp/gaardrail/app/repositories/queue"
 	"github.com/adrianozp/gaardrail/app/repositories/targets"
 	"github.com/adrianozp/gaardrail/app/usecases/consumemessage"
-	"github.com/adrianozp/gaardrail/app/usecases/orchestrator"
+	"github.com/adrianozp/gaardrail/app/orchestrator"
 	"github.com/adrianozp/gaardrail/app/usecases/processmetrics"
 	"github.com/adrianozp/gaardrail/pkg/config"
 	"go.uber.org/fx"

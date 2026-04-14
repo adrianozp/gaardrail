@@ -3,7 +3,7 @@ package options
 import (
 	"context"
 
-	"github.com/adrianozp/gaardrail/app/usecases/orchestrator"
+	"github.com/adrianozp/gaardrail/app/orchestrator"
 	"github.com/adrianozp/gaardrail/cmd/api/modules"
 	"github.com/adrianozp/gaardrail/internal/httpserver"
 	"github.com/adrianozp/gaardrail/pkg/config"

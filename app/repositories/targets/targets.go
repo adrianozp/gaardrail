@@ -13,7 +13,7 @@ import (
 )
 
 type Pusher interface {
-	Push(context.Context, entities.Message) ([]byte, error)
+	Push(context.Context, entities.Message) (entities.Response, error)
 }
 
 func NewTarget(cfg config.Config) (Pusher, error) {

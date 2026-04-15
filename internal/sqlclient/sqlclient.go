@@ -45,9 +45,16 @@ func NewFromDB(db *sql.DB) *Client {
 	return &Client{db: db}
 }
 
-func (c *Client) ExecContext(ctx context.Context, query string) error {
-	_, err := c.db.ExecContext(ctx, query)
-	return err
+func (c *Client) ExecContext(ctx context.Context, query string) (int64, error) {
+	result, err := c.db.ExecContext(ctx, query)
+	if err != nil {
+		return 0, err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	return rows, nil
 }
 
 func (c *Client) Close() error {

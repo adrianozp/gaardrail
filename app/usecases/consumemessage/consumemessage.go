@@ -11,44 +11,51 @@ import (
 )
 
 //go:generate mockery --all --output=mocks --outpkg=mocks
-type Queue interface {
+type SourceQueue interface {
 	Dequeue(context.Context) (entities.Message, error)
 	Ack(context.Context, entities.Message) error
 	Size() (int64, error)
 }
 
 type Target interface {
-	Push(context.Context, entities.Message) ([]byte, error)
+	Push(context.Context, entities.Message) (entities.Response, error)
+}
+
+type ResponseQueue interface {
+	Enqueue(context.Context, entities.Response)
 }
 
 type ConsumeMessageUseCase struct {
-	queue  Queue
-	target Target
+	sourceQueue   SourceQueue
+	target        Target
+	responseQueue ResponseQueue
 }
 
-func NewConsumeMessageUseCase(q Queue, t Target) ConsumeMessageUseCase {
+func NewConsumeMessageUseCase(sq SourceQueue, t Target, rq ResponseQueue) ConsumeMessageUseCase {
 	return ConsumeMessageUseCase{
-		queue:  q,
-		target: t,
+		sourceQueue:   sq,
+		target:        t,
+		responseQueue: rq,
 	}
 }
 
 func (u ConsumeMessageUseCase) Consume(ctx context.Context) (string, error) {
 	consumeStartTime := clock.Now()
-	message, err := u.queue.Dequeue(ctx)
+	message, err := u.sourceQueue.Dequeue(ctx)
 	metrics.Gauge(map[string]float64{"dequeue_time_seconds": clock.Now().Sub(consumeStartTime).Seconds()})
 	if err != nil {
 		log.Error().Msg("error dequeing message")
 		return "", err
 	}
 
-	_, err = u.target.Push(ctx, message)
+	response, err := u.target.Push(ctx, message)
 	if err != nil {
 		log.Error().Str("message_id", message.ID).Msg("error pushing message")
 		return "", err
 	}
+	u.responseQueue.Enqueue(ctx, response)
 
-	err = u.queue.Ack(ctx, message)
+	err = u.sourceQueue.Ack(ctx, message)
 	if err != nil {
 		log.Error().Str("message_id", message.ID).Msg("error consuming message")
 		return "", err
@@ -71,5 +78,5 @@ func sendMetrics(consumeStartTime time.Time, message entities.Message) {
 }
 
 func (u ConsumeMessageUseCase) Size() (int64, error) {
-	return u.queue.Size()
+	return u.sourceQueue.Size()
 }

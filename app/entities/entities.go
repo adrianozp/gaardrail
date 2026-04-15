@@ -9,6 +9,13 @@ type Message struct {
 	CreatedAt time.Time
 }
 
+type Response struct {
+	ID        string
+	Body      []byte
+	CreatedAt time.Time
+	PushedAt  time.Time
+}
+
 type Metrics struct {
 	MeasureTime time.Time
 	Metrics     map[string]float64

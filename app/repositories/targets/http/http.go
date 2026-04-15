@@ -5,6 +5,7 @@ import (
 
 	"github.com/adrianozp/gaardrail/app/entities"
 	"github.com/adrianozp/gaardrail/internal/httpclient"
+	"github.com/adrianozp/gaardrail/pkg/clock"
 	"github.com/rs/zerolog/log"
 )
 
@@ -24,7 +25,18 @@ func NewHTTPRepository(client *httpclient.Client, cfg Config) *HTTPRepository {
 	}
 }
 
-func (r *HTTPRepository) Push(ctx context.Context, m entities.Message) ([]byte, error) {
+func (r *HTTPRepository) Push(ctx context.Context, m entities.Message) (entities.Response, error) {
 	log.Debug().Str("message_id", m.ID).Msg("sent command body")
-	return r.client.Post(ctx, r.path, m.Body)
+
+	response, err := r.client.Post(ctx, r.path, m.Body)
+	if err != nil {
+		return entities.Response{}, err
+	}
+
+	return entities.Response{
+		ID:        m.ID,
+		CreatedAt: m.CreatedAt,
+		PushedAt:  clock.Now(),
+		Body:      response,
+	}, nil
 }

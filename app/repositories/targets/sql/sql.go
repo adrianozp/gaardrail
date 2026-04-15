@@ -16,7 +16,7 @@ func NewSQLRepository(client *sqlclient.Client) *SQLRepository {
 	return &SQLRepository{client: client}
 }
 
-func (r *SQLRepository) Push(ctx context.Context, m entities.Message) error {
+func (r *SQLRepository) Push(ctx context.Context, m entities.Message) ([]byte, error) {
 	log.Debug().Str("message_id", m.ID).Msg("executing sql query")
-	return r.client.ExecContext(ctx, string(m.Body))
+	return []byte{}, r.client.ExecContext(ctx, string(m.Body))
 }

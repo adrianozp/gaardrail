@@ -23,7 +23,7 @@ func TestSQLRepository_Push_ExecutesQueryFromBody(t *testing.T) {
 	client := sqlclient.NewFromDB(db)
 	repo := sqlrepo.NewSQLRepository(client)
 
-	err = repo.Push(context.Background(), entities.Message{ID: "abc", Body: []byte(query)})
+	_, err = repo.Push(context.Background(), entities.Message{ID: "abc", Body: []byte(query)})
 	require.NoError(t, err)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
@@ -38,7 +38,7 @@ func TestSQLRepository_Push_ReturnsErrorOnQueryFailure(t *testing.T) {
 	client := sqlclient.NewFromDB(db)
 	repo := sqlrepo.NewSQLRepository(client)
 
-	err = repo.Push(context.Background(), entities.Message{ID: "1", Body: []byte("SELECT 1")})
+	_, err = repo.Push(context.Background(), entities.Message{ID: "1", Body: []byte("SELECT 1")})
 	require.Error(t, err)
 	require.NoError(t, mock.ExpectationsWereMet())
 }

@@ -18,7 +18,7 @@ type Queue interface {
 }
 
 type Target interface {
-	Push(context.Context, entities.Message) error
+	Push(context.Context, entities.Message) ([]byte, error)
 }
 
 type ConsumeMessageUseCase struct {
@@ -42,7 +42,7 @@ func (u ConsumeMessageUseCase) Consume(ctx context.Context) (string, error) {
 		return "", err
 	}
 
-	err = u.target.Push(ctx, message)
+	_, err = u.target.Push(ctx, message)
 	if err != nil {
 		log.Error().Str("message_id", message.ID).Msg("error pushing message")
 		return "", err

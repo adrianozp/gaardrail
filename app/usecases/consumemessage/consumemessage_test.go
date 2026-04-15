@@ -33,7 +33,7 @@ func TestConsume_Success(t *testing.T) {
 	mockQueue := mocks.NewQueue(t)
 	mockTarget := mocks.NewTarget(t)
 	mockQueue.On("Dequeue", mock.Anything).Return(msg, nil)
-	mockTarget.On("Push", mock.Anything, msg).Return(nil)
+	mockTarget.On("Push", mock.Anything, msg).Return([]byte{}, nil)
 	mockQueue.On("Ack", mock.Anything, msg).Return(nil)
 
 	uc := consumemessage.NewConsumeMessageUseCase(mockQueue, mockTarget)
@@ -62,7 +62,7 @@ func TestConsume_PushError(t *testing.T) {
 	mockQueue := mocks.NewQueue(t)
 	mockTarget := mocks.NewTarget(t)
 	mockQueue.On("Dequeue", mock.Anything).Return(msg, nil)
-	mockTarget.On("Push", mock.Anything, msg).Return(errors.New("push failed"))
+	mockTarget.On("Push", mock.Anything, msg).Return([]byte{}, errors.New("push failed"))
 
 	uc := consumemessage.NewConsumeMessageUseCase(mockQueue, mockTarget)
 	id, err := uc.Consume(ctx)
@@ -77,7 +77,7 @@ func TestConsume_AckError(t *testing.T) {
 	mockQueue := mocks.NewQueue(t)
 	mockTarget := mocks.NewTarget(t)
 	mockQueue.On("Dequeue", mock.Anything).Return(msg, nil)
-	mockTarget.On("Push", mock.Anything, msg).Return(nil)
+	mockTarget.On("Push", mock.Anything, msg).Return([]byte{}, nil)
 	mockQueue.On("Ack", mock.Anything, msg).Return(errors.New("ack failed"))
 
 	uc := consumemessage.NewConsumeMessageUseCase(mockQueue, mockTarget)
@@ -108,7 +108,7 @@ func TestConsume_RecordsDequeueTime(t *testing.T) {
 	mockQueue := mocks.NewQueue(t)
 	mockTarget := mocks.NewTarget(t)
 	mockQueue.On("Dequeue", mock.Anything).Return(msg, nil)
-	mockTarget.On("Push", mock.Anything, msg).Return(nil)
+	mockTarget.On("Push", mock.Anything, msg).Return([]byte{}, nil)
 	mockQueue.On("Ack", mock.Anything, msg).Return(nil)
 
 	rec := &captureRecorder{gauged: map[string]float64{}}

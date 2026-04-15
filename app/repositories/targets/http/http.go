@@ -24,7 +24,7 @@ func NewHTTPRepository(client *httpclient.Client, cfg Config) *HTTPRepository {
 	}
 }
 
-func (r *HTTPRepository) Push(ctx context.Context, m entities.Message) error {
+func (r *HTTPRepository) Push(ctx context.Context, m entities.Message) ([]byte, error) {
 	log.Debug().Str("message_id", m.ID).Msg("sent command body")
 	return r.client.Post(ctx, r.path, m.Body)
 }

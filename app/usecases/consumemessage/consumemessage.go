@@ -26,16 +26,14 @@ type ResponseQueue interface {
 }
 
 type ConsumeMessageUseCase struct {
-	sourceQueue   SourceQueue
-	target        Target
-	responseQueue ResponseQueue
+	sourceQueue SourceQueue
+	target      Target
 }
 
-func NewConsumeMessageUseCase(sq SourceQueue, t Target, rq ResponseQueue) ConsumeMessageUseCase {
+func NewConsumeMessageUseCase(sq SourceQueue, t Target) ConsumeMessageUseCase {
 	return ConsumeMessageUseCase{
-		sourceQueue:   sq,
-		target:        t,
-		responseQueue: rq,
+		sourceQueue: sq,
+		target:      t,
 	}
 }
 
@@ -48,12 +46,12 @@ func (u ConsumeMessageUseCase) Consume(ctx context.Context) (string, error) {
 		return "", err
 	}
 
-	response, err := u.target.Push(ctx, message)
+	_, err = u.target.Push(ctx, message)
 	if err != nil {
 		log.Error().Str("message_id", message.ID).Msg("error pushing message")
 		return "", err
 	}
-	u.responseQueue.Enqueue(ctx, response)
+	// u.responseQueue.Enqueue(ctx, response)
 
 	err = u.sourceQueue.Ack(ctx, message)
 	if err != nil {

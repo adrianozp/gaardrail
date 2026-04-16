@@ -32,13 +32,11 @@ func TestConsume_Success(t *testing.T) {
 	msg := entities.Message{ID: "msg-1"}
 	mockQueue := mocks.NewSourceQueue(t)
 	mockTarget := mocks.NewTarget(t)
-	mockRQ := mocks.NewResponseQueue(t)
 	mockQueue.On("Dequeue", mock.Anything).Return(msg, nil)
 	mockTarget.On("Push", mock.Anything, msg).Return(entities.Response{}, nil)
-	mockRQ.On("Enqueue", mock.Anything, mock.Anything).Return()
 	mockQueue.On("Ack", mock.Anything, msg).Return(nil)
 
-	uc := consumemessage.NewConsumeMessageUseCase(mockQueue, mockTarget, mockRQ)
+	uc := consumemessage.NewConsumeMessageUseCase(mockQueue, mockTarget)
 	id, err := uc.Consume(ctx)
 
 	assert.NoError(t, err)
@@ -49,10 +47,9 @@ func TestConsume_DequeueError(t *testing.T) {
 	ctx := context.Background()
 	mockQueue := mocks.NewSourceQueue(t)
 	mockTarget := mocks.NewTarget(t)
-	mockRQ := mocks.NewResponseQueue(t)
 	mockQueue.On("Dequeue", mock.Anything).Return(entities.Message{}, errors.New("dequeue failed"))
 
-	uc := consumemessage.NewConsumeMessageUseCase(mockQueue, mockTarget, mockRQ)
+	uc := consumemessage.NewConsumeMessageUseCase(mockQueue, mockTarget)
 	id, err := uc.Consume(ctx)
 
 	assert.EqualError(t, err, "dequeue failed")
@@ -64,11 +61,10 @@ func TestConsume_PushError(t *testing.T) {
 	msg := entities.Message{ID: "msg-2"}
 	mockQueue := mocks.NewSourceQueue(t)
 	mockTarget := mocks.NewTarget(t)
-	mockRQ := mocks.NewResponseQueue(t)
 	mockQueue.On("Dequeue", mock.Anything).Return(msg, nil)
 	mockTarget.On("Push", mock.Anything, msg).Return(entities.Response{}, errors.New("push failed"))
 
-	uc := consumemessage.NewConsumeMessageUseCase(mockQueue, mockTarget, mockRQ)
+	uc := consumemessage.NewConsumeMessageUseCase(mockQueue, mockTarget)
 	id, err := uc.Consume(ctx)
 
 	assert.EqualError(t, err, "push failed")
@@ -80,38 +76,15 @@ func TestConsume_AckError(t *testing.T) {
 	msg := entities.Message{ID: "msg-3"}
 	mockQueue := mocks.NewSourceQueue(t)
 	mockTarget := mocks.NewTarget(t)
-	mockRQ := mocks.NewResponseQueue(t)
 	mockQueue.On("Dequeue", mock.Anything).Return(msg, nil)
 	mockTarget.On("Push", mock.Anything, msg).Return(entities.Response{}, nil)
-	mockRQ.On("Enqueue", mock.Anything, mock.Anything).Return()
 	mockQueue.On("Ack", mock.Anything, msg).Return(errors.New("ack failed"))
 
-	uc := consumemessage.NewConsumeMessageUseCase(mockQueue, mockTarget, mockRQ)
+	uc := consumemessage.NewConsumeMessageUseCase(mockQueue, mockTarget)
 	id, err := uc.Consume(ctx)
 
 	assert.EqualError(t, err, "ack failed")
 	assert.Empty(t, id)
-}
-
-func TestConsume_EnqueuesResponse(t *testing.T) {
-	ctx := context.Background()
-	msg := entities.Message{ID: "msg-4"}
-	resp := entities.Response{ID: "resp-1", Body: []byte("ok")}
-
-	mockQueue := mocks.NewSourceQueue(t)
-	mockTarget := mocks.NewTarget(t)
-	mockRQ := mocks.NewResponseQueue(t)
-
-	mockQueue.On("Dequeue", mock.Anything).Return(msg, nil)
-	mockTarget.On("Push", mock.Anything, msg).Return(resp, nil)
-	mockQueue.On("Ack", mock.Anything, msg).Return(nil)
-	mockRQ.On("Enqueue", mock.Anything, resp).Return()
-
-	uc := consumemessage.NewConsumeMessageUseCase(mockQueue, mockTarget, mockRQ)
-	_, err := uc.Consume(ctx)
-
-	require.NoError(t, err)
-	mockRQ.AssertCalled(t, "Enqueue", mock.Anything, resp)
 }
 
 func TestConsume_RecordsDequeueTime(t *testing.T) {
@@ -134,17 +107,15 @@ func TestConsume_RecordsDequeueTime(t *testing.T) {
 	msg := entities.Message{ID: "msg-1"}
 	mockQueue := mocks.NewSourceQueue(t)
 	mockTarget := mocks.NewTarget(t)
-	mockRQ := mocks.NewResponseQueue(t)
 	mockQueue.On("Dequeue", mock.Anything).Return(msg, nil)
 	mockTarget.On("Push", mock.Anything, msg).Return(entities.Response{}, nil)
-	mockRQ.On("Enqueue", mock.Anything, mock.Anything).Return()
 	mockQueue.On("Ack", mock.Anything, msg).Return(nil)
 
 	rec := &captureRecorder{gauged: map[string]float64{}}
 	metrics.SetRecorder(rec)
 	t.Cleanup(func() { metrics.SetRecorder(&captureRecorder{gauged: map[string]float64{}}) })
 
-	uc := consumemessage.NewConsumeMessageUseCase(mockQueue, mockTarget, mockRQ)
+	uc := consumemessage.NewConsumeMessageUseCase(mockQueue, mockTarget)
 	_, err := uc.Consume(ctx)
 
 	require.NoError(t, err)

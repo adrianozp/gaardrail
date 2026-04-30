@@ -14,6 +14,7 @@ type Config struct {
 	HTTP          HTTP          `mapstructure:"http"`
 	Queue         Queue         `mapstructure:"queue"`
 	Kafka         Kafka         `mapstructure:"kafka"`
+	SQS           SQS           `mapstructure:"sqs"`
 	Target        Target        `mapstructure:"target"`
 	MetricsPoller MetricsPoller `mapstructure:"metrics_poller"`
 	PID           PID           `mapstructure:"pid"`
@@ -45,6 +46,14 @@ type Kafka struct {
 	Topic     string   `mapstructure:"topic"     default:"messages"  validate:"required"`
 	Partition int32    `mapstructure:"partition" default:"0"`
 	GroupID   string   `mapstructure:"group_id"  default:"gaardrail" validate:"required"`
+}
+
+type SQS struct {
+	Region            string `mapstructure:"region"             default:"us-east-1"`
+	QueueURL          string `mapstructure:"queue_url"`
+	MaxMessages       int32  `mapstructure:"max_messages"       default:"1"  validate:"min=1,max=10"`
+	WaitTimeSeconds   int32  `mapstructure:"wait_time_seconds"  default:"20"`
+	VisibilityTimeout int32  `mapstructure:"visibility_timeout" default:"30"`
 }
 
 type Target struct {
@@ -128,6 +137,11 @@ func Load() (Config, error) {
 	_ = viper.BindEnv("orchestrator.rate")
 	_ = viper.BindEnv("orchestrator.burst")
 	_ = viper.BindEnv("orchestrator.workers")
+	_ = viper.BindEnv("sqs.region")
+	_ = viper.BindEnv("sqs.queue_url")
+	_ = viper.BindEnv("sqs.max_messages")
+	_ = viper.BindEnv("sqs.wait_time_seconds")
+	_ = viper.BindEnv("sqs.visibility_timeout")
 	_ = viper.BindEnv("grafana.url")
 
 	if err := viper.Unmarshal(&cfg); err != nil {

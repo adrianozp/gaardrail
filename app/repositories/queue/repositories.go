@@ -7,6 +7,7 @@ import (
 	"github.com/adrianozp/gaardrail/app/entities"
 	inmemoryrepo "github.com/adrianozp/gaardrail/app/repositories/queue/inmemory"
 	kafkarepo "github.com/adrianozp/gaardrail/app/repositories/queue/kafka"
+	sqsrepo "github.com/adrianozp/gaardrail/app/repositories/queue/sqs"
 	kafkaclient "github.com/adrianozp/gaardrail/internal/kafka"
 	"github.com/adrianozp/gaardrail/pkg/config"
 )
@@ -28,6 +29,12 @@ func New(cfg config.Config) (Queue, error) {
 		return kafkarepo.NewKafkaRepository(client), nil
 	case "inmemory":
 		return inmemoryrepo.NewQueue(cfg.Queue.Capacity), nil
+	case "sqs":
+		repo, err := sqsrepo.New(cfg.SQS)
+		if err != nil {
+			return nil, fmt.Errorf("queue: sqs: %w", err)
+		}
+		return repo, nil
 	default:
 		return nil, fmt.Errorf("queue: unknown protocol %q", cfg.Queue.Protocol)
 	}

@@ -7,6 +7,7 @@ require (
 	github.com/IBM/sarama v1.47.0
 	github.com/aws/aws-sdk-go-v2 v1.41.7
 	github.com/aws/aws-sdk-go-v2/config v1.32.17
+	github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.56.3
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.42.27
 	github.com/creasty/defaults v1.8.0
 	github.com/gin-gonic/gin v1.12.0

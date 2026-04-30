@@ -15,6 +15,7 @@ type Config struct {
 	Queue         Queue         `mapstructure:"queue"`
 	Kafka         Kafka         `mapstructure:"kafka"`
 	SQS           SQS           `mapstructure:"sqs"`
+	CloudWatch    CloudWatch    `mapstructure:"cloudwatch"`
 	Target        Target        `mapstructure:"target"`
 	MetricsPoller MetricsPoller `mapstructure:"metrics_poller"`
 	PID           PID           `mapstructure:"pid"`
@@ -54,6 +55,12 @@ type SQS struct {
 	MaxMessages       int32  `mapstructure:"max_messages"       default:"1"  validate:"min=1,max=10"`
 	WaitTimeSeconds   int32  `mapstructure:"wait_time_seconds"  default:"20"`
 	VisibilityTimeout int32  `mapstructure:"visibility_timeout" default:"30"`
+}
+
+type CloudWatch struct {
+	Region     string            `mapstructure:"region"     default:"us-east-1"`
+	Period     int32             `mapstructure:"period"     default:"60"`
+	Dimensions map[string]string `mapstructure:"dimensions"`
 }
 
 type Target struct {
@@ -142,6 +149,8 @@ func Load() (Config, error) {
 	_ = viper.BindEnv("sqs.max_messages")
 	_ = viper.BindEnv("sqs.wait_time_seconds")
 	_ = viper.BindEnv("sqs.visibility_timeout")
+	_ = viper.BindEnv("cloudwatch.region")
+	_ = viper.BindEnv("cloudwatch.period")
 	_ = viper.BindEnv("grafana.url")
 
 	if err := viper.Unmarshal(&cfg); err != nil {

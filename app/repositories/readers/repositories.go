@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/adrianozp/gaardrail/app/entities"
+	cloudwatchrepo "github.com/adrianozp/gaardrail/app/repositories/readers/cloudwatch"
 	jsonmetricsrepo "github.com/adrianozp/gaardrail/app/repositories/readers/jsonmetrics"
 	prometheusrepo "github.com/adrianozp/gaardrail/app/repositories/readers/prometheus"
 	prometheusapirepo "github.com/adrianozp/gaardrail/app/repositories/readers/prometheusapi"
@@ -26,6 +27,8 @@ func NewMetricsReader(cfg config.Config) (MetricsReader, error) {
 		return jsonmetricsrepo.New(cfg.MetricsPoller.Endpoint, cfg.MetricsPoller.Mappings), nil
 	case "prometheusapi":
 		return prometheusapirepo.New(cfg.MetricsPoller.Endpoint, cfg.MetricsPoller.Mappings), nil
+	case "cloudwatch":
+		return cloudwatchrepo.New(cfg.CloudWatch, cfg.MetricsPoller.Mappings)
 	default:
 		return nil, fmt.Errorf("metricspoller: unknown protocol %q", cfg.MetricsPoller.Protocol)
 	}

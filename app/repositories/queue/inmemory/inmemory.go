@@ -5,6 +5,7 @@ import (
 	"sync/atomic"
 
 	"github.com/adrianozp/gaardrail/app/entities"
+	"github.com/adrianozp/gaardrail/pkg/config"
 )
 
 type Queue struct {
@@ -12,9 +13,9 @@ type Queue struct {
 	size atomic.Int64
 }
 
-func NewQueue(capacity int) *Queue {
+func New(cfg config.Config) *Queue {
 	return &Queue{
-		ch: make(chan entities.Message, capacity),
+		ch: make(chan entities.Message, cfg.Queue.Capacity),
 	}
 }
 

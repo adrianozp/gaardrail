@@ -10,9 +10,19 @@ import (
 	"github.com/adrianozp/gaardrail/app/entities"
 	"github.com/adrianozp/gaardrail/app/repositories/readers/jsonmetrics"
 	"github.com/adrianozp/gaardrail/pkg/clock"
+	"github.com/adrianozp/gaardrail/pkg/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func newCfg(endpoint string, mappings map[string]string) config.Config {
+	return config.Config{
+		MetricsPoller: config.MetricsPoller{
+			Endpoint: endpoint,
+			Mappings: mappings,
+		},
+	}
+}
 
 func TestJSONMetricsReader_Read_ExtractsMappedFields(t *testing.T) {
 	body := `{"cpu_usage": 0.55, "active_connections": 7, "ignored": 999}`
@@ -28,7 +38,7 @@ func TestJSONMetricsReader_Read_ExtractsMappedFields(t *testing.T) {
 		"cpu_usage":          "cpu",
 		"active_connections": "connections",
 	}
-	reader := jsonmetrics.New(srv.URL, mappings)
+	reader := jsonmetrics.New(newCfg(srv.URL, mappings))
 
 	result, err := reader.Read(context.Background())
 	require.NoError(t, err)
@@ -49,7 +59,7 @@ func TestJSONMetricsReader_Read_HTTPError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	reader := jsonmetrics.New(srv.URL, map[string]string{"cpu_usage": "cpu"})
+	reader := jsonmetrics.New(newCfg(srv.URL, map[string]string{"cpu_usage": "cpu"}))
 
 	_, err := reader.Read(context.Background())
 
@@ -65,7 +75,7 @@ func TestJSONMetricsReader_Read_MissingFieldSkipped(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	reader := jsonmetrics.New(srv.URL, map[string]string{"cpu_usage": "cpu"})
+	reader := jsonmetrics.New(newCfg(srv.URL, map[string]string{"cpu_usage": "cpu"}))
 
 	now := time.Date(1995, 11, 11, 0, 0, 0, 0, time.UTC)
 	clock.WithTime(now)

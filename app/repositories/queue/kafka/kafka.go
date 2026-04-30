@@ -6,6 +6,7 @@ import (
 
 	"github.com/adrianozp/gaardrail/app/entities"
 	kafkaclient "github.com/adrianozp/gaardrail/internal/kafka"
+	"github.com/adrianozp/gaardrail/pkg/config"
 	"github.com/rs/zerolog/log"
 )
 
@@ -17,8 +18,12 @@ type KafkaRepository struct {
 	client *kafkaclient.Client
 }
 
-func NewKafkaRepository(client *kafkaclient.Client) *KafkaRepository {
-	return &KafkaRepository{client: client}
+func New(cfg config.Config) (*KafkaRepository, error) {
+	client, err := kafkaclient.New(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return &KafkaRepository{client: client}, nil
 }
 
 func (r *KafkaRepository) Enqueue(m entities.Message) (string, error) {

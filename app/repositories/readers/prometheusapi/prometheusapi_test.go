@@ -9,9 +9,19 @@ import (
 
 	"github.com/adrianozp/gaardrail/app/entities"
 	"github.com/adrianozp/gaardrail/app/repositories/readers/prometheusapi"
+	"github.com/adrianozp/gaardrail/pkg/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func newCfg(endpoint string, mappings map[string]string) config.Config {
+	return config.Config{
+		MetricsPoller: config.MetricsPoller{
+			Endpoint: endpoint,
+			Mappings: mappings,
+		},
+	}
+}
 
 const successBody = `{
 	"status": "success",
@@ -29,9 +39,9 @@ func TestPrometheusAPIReader_Read_ReturnsMappedValue(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	reader := prometheusapi.New(srv.URL, map[string]string{
+	reader := prometheusapi.New(newCfg(srv.URL, map[string]string{
 		"rate(process_cpu_seconds_total[15s])*100": "cpu",
-	})
+	}))
 
 	result, err := reader.Read(context.Background())
 	require.NoError(t, err)
@@ -49,7 +59,7 @@ func TestPrometheusAPIReader_Read_HTTPError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	reader := prometheusapi.New(srv.URL, map[string]string{"rate(cpu[15s])": "cpu"})
+	reader := prometheusapi.New(newCfg(srv.URL, map[string]string{"rate(cpu[15s])": "cpu"}))
 
 	_, err := reader.Read(context.Background())
 	require.Error(t, err)
@@ -63,7 +73,7 @@ func TestPrometheusAPIReader_Read_EmptyResult_ReturnsError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	reader := prometheusapi.New(srv.URL, map[string]string{"nonexistent": "cpu"})
+	reader := prometheusapi.New(newCfg(srv.URL, map[string]string{"nonexistent": "cpu"}))
 
 	_, err := reader.Read(context.Background())
 	require.Error(t, err)

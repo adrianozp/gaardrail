@@ -20,19 +20,19 @@ type SQSRepository struct {
 	cfg    config.SQS
 }
 
-func New(cfg config.SQS) (*SQSRepository, error) {
-	if cfg.QueueURL == "" {
+func New(cfg config.Config) (*SQSRepository, error) {
+	if cfg.SQS.QueueURL == "" {
 		return nil, errors.New("sqs: queue_url is required")
 	}
 	awscfg, err := awsconfig.LoadDefaultConfig(context.Background(),
-		awsconfig.WithRegion(cfg.Region),
+		awsconfig.WithRegion(cfg.SQS.Region),
 	)
 	if err != nil {
 		return nil, err
 	}
 	return &SQSRepository{
 		client: sqs.NewFromConfig(awscfg),
-		cfg:    cfg,
+		cfg:    cfg.SQS,
 	}, nil
 }
 

@@ -8,21 +8,19 @@ import (
 
 	"github.com/adrianozp/gaardrail/app/entities"
 	"github.com/adrianozp/gaardrail/pkg/clock"
+	"github.com/adrianozp/gaardrail/pkg/config"
 )
 
-// JSONMetricsReader scrapes a flat JSON object endpoint and maps source field
-// names to domain names via the configured Mappings.
-// All JSON values must be numeric (float64). Non-numeric fields are ignored.
 type JSONMetricsReader struct {
 	endpoint string
 	mappings map[string]string
 	client   *http.Client
 }
 
-func New(endpoint string, mappings map[string]string) *JSONMetricsReader {
+func New(cfg config.Config) *JSONMetricsReader {
 	return &JSONMetricsReader{
-		endpoint: endpoint,
-		mappings: mappings,
+		endpoint: cfg.MetricsPoller.Endpoint,
+		mappings: cfg.MetricsPoller.Mappings,
 		client:   &http.Client{},
 	}
 }

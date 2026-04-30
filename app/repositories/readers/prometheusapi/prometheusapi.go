@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/adrianozp/gaardrail/app/entities"
+	"github.com/adrianozp/gaardrail/pkg/config"
 	"github.com/rs/zerolog/log"
 )
 
@@ -19,10 +20,10 @@ type Reader struct {
 	http     *http.Client
 }
 
-func New(endpoint string, mappings map[string]string) *Reader {
+func New(cfg config.Config) *Reader {
 	return &Reader{
-		endpoint: endpoint,
-		mappings: mappings,
+		endpoint: cfg.MetricsPoller.Endpoint,
+		mappings: cfg.MetricsPoller.Mappings,
 		http:     &http.Client{Timeout: 5 * time.Second},
 	}
 }

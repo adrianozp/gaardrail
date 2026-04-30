@@ -22,15 +22,15 @@ type Reader struct {
 	dimensions []cwtypes.Dimension
 }
 
-func New(cfg config.CloudWatch, mappings map[string]string) (*Reader, error) {
+func New(cfg config.Config) (*Reader, error) {
 	awscfg, err := awsconfig.LoadDefaultConfig(context.Background(),
-		awsconfig.WithRegion(cfg.Region),
+		awsconfig.WithRegion(cfg.CloudWatch.Region),
 	)
 	if err != nil {
 		return nil, err
 	}
-	dims := make([]cwtypes.Dimension, 0, len(cfg.Dimensions))
-	for k, v := range cfg.Dimensions {
+	dims := make([]cwtypes.Dimension, 0, len(cfg.CloudWatch.Dimensions))
+	for k, v := range cfg.CloudWatch.Dimensions {
 		dims = append(dims, cwtypes.Dimension{
 			Name:  aws.String(k),
 			Value: aws.String(v),
@@ -38,8 +38,8 @@ func New(cfg config.CloudWatch, mappings map[string]string) (*Reader, error) {
 	}
 	return &Reader{
 		client:     cloudwatch.NewFromConfig(awscfg),
-		cfg:        cfg,
-		mappings:   mappings,
+		cfg:        cfg.CloudWatch,
+		mappings:   cfg.MetricsPoller.Mappings,
 		dimensions: dims,
 	}, nil
 }

@@ -10,9 +10,19 @@ import (
 	"github.com/adrianozp/gaardrail/app/entities"
 	"github.com/adrianozp/gaardrail/app/repositories/readers/prometheus"
 	"github.com/adrianozp/gaardrail/pkg/clock"
+	"github.com/adrianozp/gaardrail/pkg/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func newCfg(endpoint string, mappings map[string]string) config.Config {
+	return config.Config{
+		MetricsPoller: config.MetricsPoller{
+			Endpoint: endpoint,
+			Mappings: mappings,
+		},
+	}
+}
 
 const prometheusBody = `# HELP process_cpu_seconds_total Total CPU time.
 # TYPE process_cpu_seconds_total counter
@@ -38,7 +48,7 @@ func TestPrometheusMetricsReader_Read_ExtractsMappedMetrics(t *testing.T) {
 		"process_cpu_seconds_total":             "cpu",
 		"mysql_global_status_threads_connected": "connections",
 	}
-	reader := prometheus.New(srv.URL, mappings)
+	reader := prometheus.New(newCfg(srv.URL, mappings))
 
 	result, err := reader.Read(context.Background())
 	require.NoError(t, err)
@@ -59,7 +69,7 @@ func TestPrometheusMetricsReader_Read_HTTPError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	reader := prometheus.New(srv.URL, map[string]string{"cpu_total": "cpu"})
+	reader := prometheus.New(newCfg(srv.URL, map[string]string{"cpu_total": "cpu"}))
 
 	_, err := reader.Read(context.Background())
 
@@ -79,7 +89,7 @@ func TestPrometheusMetricsReader_Read_MissingMetricSkipped(t *testing.T) {
 	mappings := map[string]string{
 		"nonexistent_metric": "cpu",
 	}
-	reader := prometheus.New(srv.URL, mappings)
+	reader := prometheus.New(newCfg(srv.URL, mappings))
 
 	result, err := reader.Read(context.Background())
 

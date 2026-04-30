@@ -7,6 +7,7 @@ import (
 
 	"github.com/adrianozp/gaardrail/app/entities"
 	"github.com/adrianozp/gaardrail/pkg/clock"
+	"github.com/adrianozp/gaardrail/pkg/config"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
@@ -16,21 +17,16 @@ func init() {
 	model.NameValidationScheme = model.UTF8Validation
 }
 
-// PrometheusMetricsReader scrapes a Prometheus text-format endpoint and maps
-// source metric names to domain names via the configured Mappings.
-// Only the first sample of each matched metric family is used (suitable for
-// no-label or single-instance metrics such as those from mysqld_exporter or
-// node_exporter).
 type PrometheusMetricsReader struct {
 	endpoint string
 	mappings map[string]string
 	client   *http.Client
 }
 
-func New(endpoint string, mappings map[string]string) *PrometheusMetricsReader {
+func New(cfg config.Config) *PrometheusMetricsReader {
 	return &PrometheusMetricsReader{
-		endpoint: endpoint,
-		mappings: mappings,
+		endpoint: cfg.MetricsPoller.Endpoint,
+		mappings: cfg.MetricsPoller.Mappings,
 		client:   &http.Client{},
 	}
 }

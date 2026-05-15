@@ -5,20 +5,19 @@ import (
 	"fmt"
 
 	"github.com/adrianozp/gaardrail/app/handlers/pollmetrics"
+	"github.com/adrianozp/gaardrail/app/repositories/controllers"
 	"github.com/adrianozp/gaardrail/app/repositories/readers"
 	cloudwatchrepo "github.com/adrianozp/gaardrail/app/repositories/readers/cloudwatch"
 	jsonmetricsrepo "github.com/adrianozp/gaardrail/app/repositories/readers/jsonmetrics"
 	prometheusrepo "github.com/adrianozp/gaardrail/app/repositories/readers/prometheus"
 	prometheusapirepo "github.com/adrianozp/gaardrail/app/repositories/readers/prometheusapi"
 	"github.com/adrianozp/gaardrail/app/usecases/processmetrics"
-	"github.com/adrianozp/gaardrail/internal/controller"
 	"github.com/adrianozp/gaardrail/pkg/config"
 	"go.uber.org/fx"
 )
 
 func MetricsPollerFactories() fx.Option {
 	return fx.Provide(
-		controller.New,
 		processmetrics.NewProcessMetricsUseCase,
 		newMetricsReader,
 		pollmetrics.New,
@@ -45,7 +44,7 @@ func newMetricsReader(cfg config.Config) (readers.MetricsReader, error) {
 
 func MetricsPollerInjections() fx.Option {
 	return fx.Provide(
-		func(c *controller.Controller) processmetrics.Controller { return c },
+		func(c controllers.Controller) processmetrics.Controller { return c },
 		func(uc processmetrics.ProcessMetricsUseCase) pollmetrics.ProcessMetrics { return uc },
 		func(r readers.MetricsReader) pollmetrics.MetricsReader { return r },
 	)

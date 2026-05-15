@@ -18,6 +18,7 @@ type Config struct {
 	CloudWatch    CloudWatch    `mapstructure:"cloudwatch"`
 	Target        Target        `mapstructure:"target"`
 	MetricsPoller MetricsPoller `mapstructure:"metrics_poller"`
+	Controller    Controller    `mapstructure:"controller"`
 	PID           PID           `mapstructure:"pid"`
 	Orchestrator  Orchestrator  `mapstructure:"orchestrator"`
 	Grafana       Grafana       `mapstructure:"grafana"`

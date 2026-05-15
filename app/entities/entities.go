@@ -21,7 +21,7 @@ type Metrics struct {
 	Metrics     map[string]float64
 }
 
-type PIDParams struct {
+type ControllerParams struct {
 	Kp       *float64
 	Ki       *float64
 	Kd       *float64

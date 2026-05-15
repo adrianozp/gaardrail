@@ -12,8 +12,8 @@ type updatePIDParamsRequest struct {
 	Setpoint *float64 `json:"setpoint"`
 }
 
-func (r updatePIDParamsRequest) toPIDParams() entities.PIDParams {
-	return entities.PIDParams{
+func (r updatePIDParamsRequest) toPIDParams() entities.ControllerParams {
+	return entities.ControllerParams{
 		Kp:       r.Kp,
 		Ki:       r.Ki,
 		Kd:       r.Kd,
@@ -35,7 +35,7 @@ type pidParamsResponse struct {
 	FilterSize int     `json:"filter_size"`
 }
 
-func pidParamsFromEntity(p entities.PIDParams) pidParamsResponse {
+func pidParamsFromEntity(p entities.ControllerParams) pidParamsResponse {
 	r := pidParamsResponse{}
 	if p.Kp != nil {
 		r.Kp = *p.Kp

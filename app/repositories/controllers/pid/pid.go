@@ -1,4 +1,4 @@
-package controller
+package pid
 
 import (
 	"errors"
@@ -20,8 +20,6 @@ type Controller struct {
 	Min, Max   float64 // output clamp
 	// IClamp is the anti-windup bound for the integral term.
 	// Should be <= Max for correct saturation behavior.
-	// If IClamp > Max, the integral alone can saturate the output at Max
-	// while continuing to grow, which undermines the anti-windup guarantee.
 	IClamp float64
 
 	setpoint    float64
@@ -114,14 +112,14 @@ func (c *Controller) Compute(measured float64, measureTime time.Time) (float64, 
 }
 
 // GetParams returns a snapshot of the current PID parameters.
-func (c *Controller) GetParams() entities.PIDParams {
+func (c *Controller) GetParams() entities.ControllerParams {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	kp, ki, kd := c.Kp, c.Ki, c.Kd
 	min, max, iclamp, setpoint := c.Min, c.Max, c.IClamp, c.setpoint
 
-	return entities.PIDParams{
+	return entities.ControllerParams{
 		Kp:       &kp,
 		Ki:       &ki,
 		Kd:       &kd,
@@ -134,7 +132,7 @@ func (c *Controller) GetParams() entities.PIDParams {
 
 // SetParams updates PID parameters at runtime. Only non-nil fields are updated.
 // Resets integral accumulator to avoid windup from previous gains.
-func (c *Controller) SetParams(p entities.PIDParams) error {
+func (c *Controller) SetParams(p entities.ControllerParams) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 

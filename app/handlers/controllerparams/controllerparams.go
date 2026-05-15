@@ -7,30 +7,30 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-//go:generate mockery --name=PIDParamsUseCase --output=mocks --outpkg=mocks
-type PIDParamsUseCase interface {
-	Update(p entities.PIDParams) error
-	Get() entities.PIDParams
+//go:generate mockery --name=ControllerParamsUseCase --output=mocks --outpkg=mocks
+type ControllerParamsUseCase interface {
+	Update(p entities.ControllerParams) error
+	Get() entities.ControllerParams
 }
 
-type PIDParamsHandler struct {
-	usecase PIDParamsUseCase
+type ControllerParamsHandler struct {
+	usecase ControllerParamsUseCase
 }
 
-func New(usecase PIDParamsUseCase) *PIDParamsHandler {
-	return &PIDParamsHandler{usecase: usecase}
+func New(usecase ControllerParamsUseCase) *ControllerParamsHandler {
+	return &ControllerParamsHandler{usecase: usecase}
 }
 
-func RegisterRoutes(router *gin.Engine, h *PIDParamsHandler) {
+func RegisterRoutes(router *gin.Engine, h *ControllerParamsHandler) {
 	router.GET("/pid", h.HandleGet)
 	router.PATCH("/pid", h.HandleUpdate)
 }
 
-func (h *PIDParamsHandler) HandleGet(c *gin.Context) {
+func (h *ControllerParamsHandler) HandleGet(c *gin.Context) {
 	c.JSON(http.StatusOK, pidParamsFromEntity(h.usecase.Get()))
 }
 
-func (h *PIDParamsHandler) HandleUpdate(c *gin.Context) {
+func (h *ControllerParamsHandler) HandleUpdate(c *gin.Context) {
 	var req updatePIDParamsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

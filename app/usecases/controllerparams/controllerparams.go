@@ -1,11 +1,11 @@
-package pidparams
+package controllerparams
 
 import "github.com/adrianozp/gaardrail/app/entities"
 
 //go:generate mockery --all --output=mocks --outpkg=mocks
 type Controller interface {
-	SetParams(p entities.PIDParams) error
-	GetParams() entities.PIDParams
+	SetParams(p entities.ControllerParams) error
+	GetParams() entities.ControllerParams
 }
 
 type UseCase struct {
@@ -16,10 +16,10 @@ func New(c Controller) UseCase {
 	return UseCase{controller: c}
 }
 
-func (u UseCase) Update(p entities.PIDParams) error {
+func (u UseCase) Update(p entities.ControllerParams) error {
 	return u.controller.SetParams(p)
 }
 
-func (u UseCase) Get() entities.PIDParams {
+func (u UseCase) Get() entities.ControllerParams {
 	return u.controller.GetParams()
 }

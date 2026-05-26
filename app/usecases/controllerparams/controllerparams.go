@@ -6,6 +6,7 @@ import "github.com/adrianozp/gaardrail/app/entities"
 type Controller interface {
 	SetParams(p entities.ControllerParams) error
 	GetParams() entities.ControllerParams
+	Type() string
 }
 
 type UseCase struct {
@@ -22,4 +23,9 @@ func (u UseCase) Update(p entities.ControllerParams) error {
 
 func (u UseCase) Get() entities.ControllerParams {
 	return u.controller.GetParams()
+}
+
+// CurrentType returns the type of the currently active controller.
+func (u UseCase) CurrentType() string {
+	return u.controller.Type()
 }

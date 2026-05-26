@@ -12,4 +12,6 @@ type Controller interface {
 	SetParams(p entities.ControllerParams) error
 	SetSetpoint(setpoint float64) error
 	Reset()
+	// Type returns the controller's identifier (e.g. "pid", "step").
+	Type() string
 }

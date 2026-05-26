@@ -19,15 +19,12 @@ func NewStep(cfg config.Config) *Step {
 	return &Step{max: cfg.PID.Max}
 }
 
-func (c *Step) Compute(measured float64, _ time.Time) (float64, error) {
+func (c *Step) Compute(_ float64, _ time.Time) (float64, error) {
 	c.mu.RLock()
 	max := c.max
 	c.mu.RUnlock()
 
-	metrics.Gauge(map[string]float64{
-		"step_measured": measured,
-		"step_output":   max,
-	})
+	metrics.Gauge(map[string]float64{"step_output": max})
 	return max, nil
 }
 
@@ -57,3 +54,5 @@ func (c *Step) SetSetpoint(setpoint float64) error {
 
 func (c *Step) Reset() {
 }
+
+func (c *Step) Type() string { return "step" }

@@ -95,7 +95,6 @@ func (c *Controller) Compute(measured float64, measureTime time.Time) (float64, 
 
 	metrics.Gauge(map[string]float64{
 		"pid_setpoint": c.setpoint,
-		"pid_measured": measured,
 		"pid_error":    e,
 		"pid_p_term":   p,
 		"pid_i_term":   c.i,
@@ -188,11 +187,16 @@ func (c *Controller) SetSetpoint(setpoint float64) error {
 }
 
 func (c *Controller) Reset() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	c.i = 0
 	c.prevE = 0
 	c.first = true
 	c.lastCompute = time.Time{}
 }
+
+func (c *Controller) Type() string { return "pid" }
 
 func clamp(v, lo, hi float64) float64 {
 	return math.Max(lo, math.Min(hi, v))

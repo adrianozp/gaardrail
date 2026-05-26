@@ -118,6 +118,35 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /controller/type:
+    put:
+      summary: Troca o controlador ativo em runtime (pid ↔ step)
+      operationId: switchController
+      tags: [PID]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SwitchControllerRequest"
+            example:
+              type: step
+      responses:
+        "204":
+          description: Controlador trocado com sucesso
+        "400":
+          description: JSON inválido ou campo type ausente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Tipo de controlador desconhecido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     CreateMessageRequest:
@@ -138,6 +167,10 @@ components:
     PIDParamsResponse:
       type: object
       properties:
+        type:
+          type: string
+          enum: [pid, step]
+          description: Tipo do controlador atualmente ativo
         kp:
           type: number
           format: double
@@ -170,6 +203,15 @@ components:
           type: integer
           minimum: 1
           description: Tamanho da janela do filtro de média móvel (1 = sem filtro)
+
+    SwitchControllerRequest:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [pid, step]
+          description: Tipo do controlador a ativar
 
     UpdatePIDParamsRequest:
       type: object

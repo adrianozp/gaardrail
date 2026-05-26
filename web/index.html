@@ -55,6 +55,9 @@
       border-radius: 4px;
       padding: 2px 8px;
       white-space: nowrap;
+      background: #0d1117;
+      font-family: monospace;
+      cursor: pointer;
     }
 
     #params {
@@ -229,7 +232,10 @@
   <div id="bar">
     <span class="brand">GAARDRAIL</span>
     <span class="divider">|</span>
-    <span id="ctype" title="controlador atual">—</span>
+    <select id="ctype" title="trocar controlador" onchange="switchController(this.value)">
+      <option value="pid">pid</option>
+      <option value="step">step</option>
+    </select>
     <span class="divider">|</span>
     <div id="params"></div>
     <div id="actions">
@@ -265,12 +271,17 @@
     let successTimer = null;
     let editing = false;
 
+    // The step controller only has a single tunable output: max.
+    function activeFields() {
+      return current.type === 'step' ? ['max'] : FIELDS;
+    }
+
     async function loadParams() {
       try {
         const res = await fetch('/pid');
         if (!res.ok) throw new Error(res.statusText);
         current = await res.json();
-        document.getElementById('ctype').textContent = current.type || '—';
+        if (current.type) document.getElementById('ctype').value = current.type;
         renderView();
       } catch (_) {
         renderError();
@@ -278,7 +289,7 @@
     }
 
     function renderView() {
-      document.getElementById('params').innerHTML = FIELDS.map(f => `
+      document.getElementById('params').innerHTML = activeFields().map(f => `
         <div class="param">
           <label>${f}</label>
           <span class="value">${current[f] !== undefined ? current[f] : '—'}</span>
@@ -306,7 +317,7 @@
 
     function enterEdit() {
       clearTimeout(successTimer);
-      document.getElementById('params').innerHTML = FIELDS.map(f => `
+      document.getElementById('params').innerHTML = activeFields().map(f => `
         <div class="param">
           <label>${f}</label>
           <input type="number" step="any" id="input-${f}" value="${current[f] !== undefined ? current[f] : 0}">
@@ -324,7 +335,7 @@
 
     async function saveParams() {
       const body = {};
-      for (const f of FIELDS) {
+      for (const f of activeFields()) {
         const input = document.getElementById(`input-${f}`);
         const val = parseFloat(input.value);
         if (isNaN(val)) continue;
@@ -353,6 +364,29 @@
         successTimer = setTimeout(loadParams, 2000);
       } catch (_) {
         showFeedback('error', 'Erro de rede');
+      }
+    }
+
+    // Switch the active controller. On success reload params so the visible
+    // fields follow the new type; on failure revert the selector.
+    async function switchController(type) {
+      try {
+        const res = await fetch('/controller/type', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          showFeedback('error', data.error || `Erro ${res.status}`);
+          document.getElementById('ctype').value = current.type || 'pid';
+          return;
+        }
+        showFeedback('success', null);
+        loadParams();
+      } catch (_) {
+        showFeedback('error', 'Erro de rede');
+        document.getElementById('ctype').value = current.type || 'pid';
       }
     }
 

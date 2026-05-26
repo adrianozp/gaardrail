@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/adrianozp/gaardrail/app/entities"
+	metrics "github.com/adrianozp/gaardrail/internal/metrics"
 	"github.com/rs/zerolog/log"
 )
 
@@ -35,6 +36,11 @@ func (u ProcessMetricsUseCase) Process(m entities.Metrics) error {
 		log.Error().Msg("cpu metric not found")
 		return errors.New("cpu metric not found")
 	}
+
+	// measured_cpu is the controller-agnostic process variable fed to the
+	// controller. Emitted here (not in the controller) so the dashboard shows
+	// it regardless of which controller is active.
+	metrics.Gauge(map[string]float64{"measured_cpu": cpuPercentage})
 
 	drainRate, err := u.controller.Compute(cpuPercentage, m.MeasureTime)
 	if err != nil {

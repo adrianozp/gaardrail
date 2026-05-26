@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/adrianozp/gaardrail/app/entities"
+	"github.com/adrianozp/gaardrail/pkg/config"
 	"github.com/gin-gonic/gin"
 )
 
@@ -14,11 +15,12 @@ type ControllerParamsUseCase interface {
 }
 
 type ControllerParamsHandler struct {
-	usecase ControllerParamsUseCase
+	usecase        ControllerParamsUseCase
+	controllerType string
 }
 
-func New(usecase ControllerParamsUseCase) *ControllerParamsHandler {
-	return &ControllerParamsHandler{usecase: usecase}
+func New(usecase ControllerParamsUseCase, cfg config.Config) *ControllerParamsHandler {
+	return &ControllerParamsHandler{usecase: usecase, controllerType: cfg.Controller.Type}
 }
 
 func RegisterRoutes(router *gin.Engine, h *ControllerParamsHandler) {
@@ -27,7 +29,9 @@ func RegisterRoutes(router *gin.Engine, h *ControllerParamsHandler) {
 }
 
 func (h *ControllerParamsHandler) HandleGet(c *gin.Context) {
-	c.JSON(http.StatusOK, pidParamsFromEntity(h.usecase.Get()))
+	resp := pidParamsFromEntity(h.usecase.Get())
+	resp.Type = h.controllerType
+	c.JSON(http.StatusOK, resp)
 }
 
 func (h *ControllerParamsHandler) HandleUpdate(c *gin.Context) {

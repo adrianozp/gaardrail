@@ -25,6 +25,7 @@ func (r updatePIDParamsRequest) toPIDParams() entities.ControllerParams {
 }
 
 type pidParamsResponse struct {
+	Type       string  `json:"type"`
 	Kp         float64 `json:"kp"`
 	Ki         float64 `json:"ki"`
 	Kd         float64 `json:"kd"`

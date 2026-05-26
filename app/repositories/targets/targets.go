@@ -25,6 +25,12 @@ func NewTarget(cfg config.Config) (Pusher, error) {
 		client, err := sqlclient.New(sqlclient.Config{
 			DSN:    cfg.Target.DSN,
 			Driver: cfg.Target.Driver,
+			TLS: sqlclient.TLSConfig{
+				Enabled:    cfg.Target.TLS.Enabled,
+				CAFile:     cfg.Target.TLS.CAFile,
+				SkipVerify: cfg.Target.TLS.SkipVerify,
+				ServerName: cfg.Target.TLS.ServerName,
+			},
 		})
 		if err != nil {
 			return nil, fmt.Errorf("target: sql: %w", err)

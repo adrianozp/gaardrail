@@ -1,0 +1,46 @@
+http:
+  addr: ":8080"
+
+queue:
+  protocol: kafka
+  capacity: 1000
+
+kafka:
+  brokers:
+    - "localhost:9092"
+  topic: "messages"
+  partition: 0
+  group_id: "gaardrail"
+
+target:
+  protocol: sql
+  driver: mysql
+  dsn: "root:root@tcp(localhost:3306)/gaardrail"
+
+metrics_poller:
+  enabled: true
+  interval_ms: 1000
+  protocol: prometheusapi
+  endpoint: "http://localhost:9090/api/v1/query"
+  mappings:
+    'irate(container_cpu_usage_seconds_total{container_label_com_docker_compose_service="mysql"}[1m])*100': cpu
+
+controller:
+  type: step
+
+orchestrator:
+  rate: 0
+  workers: 1
+  burst: 5
+
+grafana:
+  url: "http://localhost:3000/d/flood-test/flood-test?kiosk"
+
+pid:
+  setpoint: 50.0
+  kp: 0.005
+  ki: 0.00
+  kd: 0.00
+  min: 0.0
+  max: 5.0
+  i_clamp: 1

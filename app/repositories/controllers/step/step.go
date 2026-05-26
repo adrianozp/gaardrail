@@ -1,6 +1,7 @@
 package step
 
 import (
+	"sync"
 	"time"
 
 	"github.com/adrianozp/gaardrail/app/entities"
@@ -8,8 +9,9 @@ import (
 	"github.com/adrianozp/gaardrail/pkg/config"
 )
 
-// StepController always outputs Max, ignoring the measured value.
+// Step always outputs Max, ignoring the measured value.
 type Step struct {
+	mu  sync.RWMutex
 	max float64
 }
 
@@ -18,19 +20,34 @@ func NewStep(cfg config.Config) *Step {
 }
 
 func (c *Step) Compute(measured float64, _ time.Time) (float64, error) {
+	c.mu.RLock()
+	max := c.max
+	c.mu.RUnlock()
+
 	metrics.Gauge(map[string]float64{
 		"step_measured": measured,
-		"step_output":   c.max,
+		"step_output":   max,
 	})
-	return c.max, nil
+	return max, nil
 }
 
 func (c *Step) GetParams() entities.ControllerParams {
-	return entities.ControllerParams{}
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	max := c.max
+	return entities.ControllerParams{Max: &max}
 }
 
+// SetParams updates the step output. Only non-nil fields are applied, so PATCH
+// bodies that omit unchanged fields are safe.
 func (c *Step) SetParams(p entities.ControllerParams) error {
-	c.max = *p.Max
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if p.Max != nil {
+		c.max = *p.Max
+	}
 	return nil
 }
 

@@ -9,28 +9,20 @@ type Controller interface {
 	Type() string
 }
 
-// TypePersister stores the selected controller type so it survives a restart.
-type TypePersister interface {
-	PersistControllerType(t string) error
-}
-
 type UseCase struct {
 	controller Controller
-	persister  TypePersister
 }
 
-func New(c Controller, p TypePersister) UseCase {
-	return UseCase{controller: c, persister: p}
+func New(c Controller) UseCase {
+	return UseCase{controller: c}
 }
 
-// Switch changes the active controller and then persists the choice. The
-// runtime swap happens first so the change takes effect immediately; a
-// persistence failure is reported but the new controller is already active.
+// Switch changes the active controller at runtime. The choice is not persisted
+// to the config file: in deployment the config is a read-only volume, so the
+// switch lives only for the process lifetime and resets to the configured type
+// on restart.
 func (u UseCase) Switch(t string) error {
-	if err := u.controller.SetType(t); err != nil {
-		return err
-	}
-	return u.persister.PersistControllerType(t)
+	return u.controller.SetType(t)
 }
 
 func (u UseCase) Current() string {

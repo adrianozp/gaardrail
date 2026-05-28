@@ -7,7 +7,6 @@ import (
 	"github.com/adrianozp/gaardrail/app/repositories/controllers/switchable"
 	"github.com/adrianozp/gaardrail/app/usecases/controllerparams"
 	"github.com/adrianozp/gaardrail/app/usecases/switchcontroller"
-	"github.com/adrianozp/gaardrail/pkg/config"
 	"go.uber.org/fx"
 )
 
@@ -17,7 +16,6 @@ func ControllerFactories() fx.Option {
 		controllerparamshandler.New,
 		switchcontroller.New,
 		switchcontrollerhandler.New,
-		config.NewControllerTypeStore,
 		switchable.New,
 	)
 }
@@ -27,7 +25,6 @@ func ControllerInjections() fx.Option {
 		func(c *switchable.Controller) controllers.Controller { return c },
 		func(c *switchable.Controller) switchcontroller.Controller { return c },
 		func(c controllers.Controller) controllerparams.Controller { return c },
-		func(s config.ControllerTypeStore) switchcontroller.TypePersister { return s },
 		func(uc controllerparams.UseCase) controllerparamshandler.ControllerParamsUseCase { return uc },
 		func(uc switchcontroller.UseCase) switchcontrollerhandler.SwitchControllerUseCase { return uc },
 	)

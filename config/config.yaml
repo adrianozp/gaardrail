@@ -16,6 +16,11 @@ target:
   protocol: sql
   driver: mysql
   dsn: "root:root@tcp(localhost:3306)/gaardrail"
+  tls:
+    enabled: false      # true: criptografa a conexão com o banco (apenas mysql)
+    skip_verify: false  # true: criptografa sem verificar o certificado do servidor (cert autoassinado / testes)
+    ca_file: ""         # opcional: bundle CA em PEM para verificação completa do servidor
+    server_name: ""     # opcional: nome usado na verificação do certificado
 
 metrics_poller:
   enabled: true

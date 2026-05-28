@@ -36,6 +36,7 @@ func Load() (Config, error) {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
+	viper.AddConfigPath("config")
 	viper.AddConfigPath(os.Getenv("APP_PATH"))
 
 	if err := viper.ReadInConfig(); err != nil {

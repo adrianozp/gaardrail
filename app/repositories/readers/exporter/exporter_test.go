@@ -1,4 +1,4 @@
-package prometheus_test
+package exporter_test
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/adrianozp/gaardrail/app/entities"
-	"github.com/adrianozp/gaardrail/app/repositories/readers/prometheus"
+	"github.com/adrianozp/gaardrail/app/repositories/readers/exporter"
 	"github.com/adrianozp/gaardrail/pkg/clock"
 	"github.com/adrianozp/gaardrail/pkg/config"
 	"github.com/stretchr/testify/assert"
@@ -35,7 +35,7 @@ mysql_global_status_threads_connected 12
 ignored_metric 99
 `
 
-func TestPrometheusMetricsReader_Read_ExtractsMappedMetrics(t *testing.T) {
+func TestReader_Read_ExtractsMappedMetrics(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(prometheusBody))
@@ -48,7 +48,7 @@ func TestPrometheusMetricsReader_Read_ExtractsMappedMetrics(t *testing.T) {
 		"process_cpu_seconds_total":             "cpu",
 		"mysql_global_status_threads_connected": "connections",
 	}
-	reader := prometheus.New(newCfg(srv.URL, mappings))
+	reader := exporter.New(newCfg(srv.URL, mappings))
 
 	result, err := reader.Read(context.Background())
 	require.NoError(t, err)
@@ -63,13 +63,13 @@ func TestPrometheusMetricsReader_Read_ExtractsMappedMetrics(t *testing.T) {
 	require.Equal(t, expected, result)
 }
 
-func TestPrometheusMetricsReader_Read_HTTPError(t *testing.T) {
+func TestReader_Read_HTTPError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer srv.Close()
 
-	reader := prometheus.New(newCfg(srv.URL, map[string]string{"cpu_total": "cpu"}))
+	reader := exporter.New(newCfg(srv.URL, map[string]string{"cpu_total": "cpu"}))
 
 	_, err := reader.Read(context.Background())
 
@@ -77,7 +77,7 @@ func TestPrometheusMetricsReader_Read_HTTPError(t *testing.T) {
 	assert.Contains(t, err.Error(), "500")
 }
 
-func TestPrometheusMetricsReader_Read_MissingMetricSkipped(t *testing.T) {
+func TestReader_Read_MissingMetricSkipped(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(prometheusBody))
@@ -89,7 +89,7 @@ func TestPrometheusMetricsReader_Read_MissingMetricSkipped(t *testing.T) {
 	mappings := map[string]string{
 		"nonexistent_metric": "cpu",
 	}
-	reader := prometheus.New(newCfg(srv.URL, mappings))
+	reader := exporter.New(newCfg(srv.URL, mappings))
 
 	result, err := reader.Read(context.Background())
 

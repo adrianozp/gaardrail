@@ -4,7 +4,7 @@ type MetricsPoller struct {
 	Enabled    bool              `mapstructure:"enabled"     default:"false"`
 	IntervalMs int               `mapstructure:"interval_ms" default:"5000"`
 	Endpoint   string            `mapstructure:"endpoint"`
-	Protocol   string            `mapstructure:"protocol"    default:"prometheus"`
+	Protocol   string            `mapstructure:"protocol"    default:"exporter"`
 	Mappings   map[string]string `mapstructure:"mappings"` // config-file only, not env-overridable
 }
 

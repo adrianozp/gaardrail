@@ -9,7 +9,7 @@ import (
 	"github.com/adrianozp/gaardrail/app/repositories/readers"
 	cloudwatchrepo "github.com/adrianozp/gaardrail/app/repositories/readers/cloudwatch"
 	jsonmetricsrepo "github.com/adrianozp/gaardrail/app/repositories/readers/jsonmetrics"
-	prometheusrepo "github.com/adrianozp/gaardrail/app/repositories/readers/prometheus"
+	exporterrepo "github.com/adrianozp/gaardrail/app/repositories/readers/exporter"
 	prometheusapirepo "github.com/adrianozp/gaardrail/app/repositories/readers/prometheusapi"
 	"github.com/adrianozp/gaardrail/app/usecases/processmetrics"
 	"github.com/adrianozp/gaardrail/pkg/config"
@@ -29,8 +29,8 @@ func newMetricsReader(cfg config.Config) (readers.MetricsReader, error) {
 		return readers.Noop{}, nil
 	}
 	switch cfg.MetricsPoller.Protocol {
-	case "prometheus":
-		return prometheusrepo.New(cfg), nil
+	case "exporter":
+		return exporterrepo.New(cfg), nil
 	case "json":
 		return jsonmetricsrepo.New(cfg), nil
 	case "prometheusapi":

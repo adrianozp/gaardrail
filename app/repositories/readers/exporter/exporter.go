@@ -1,4 +1,4 @@
-package prometheus
+package exporter
 
 import (
 	"context"
@@ -17,21 +17,21 @@ func init() {
 	model.NameValidationScheme = model.UTF8Validation
 }
 
-type PrometheusMetricsReader struct {
+type Reader struct {
 	endpoint string
 	mappings map[string]string
 	client   *http.Client
 }
 
-func New(cfg config.Config) *PrometheusMetricsReader {
-	return &PrometheusMetricsReader{
+func New(cfg config.Config) *Reader {
+	return &Reader{
 		endpoint: cfg.MetricsPoller.Endpoint,
 		mappings: cfg.MetricsPoller.Mappings,
 		client:   &http.Client{},
 	}
 }
 
-func (r *PrometheusMetricsReader) Read(ctx context.Context) (entities.Metrics, error) {
+func (r *Reader) Read(ctx context.Context) (entities.Metrics, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, r.endpoint, nil)
 	if err != nil {
 		return entities.Metrics{}, err
@@ -44,13 +44,13 @@ func (r *PrometheusMetricsReader) Read(ctx context.Context) (entities.Metrics, e
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return entities.Metrics{}, fmt.Errorf("prometheus: unexpected status %d", resp.StatusCode)
+		return entities.Metrics{}, fmt.Errorf("exporter: unexpected status %d", resp.StatusCode)
 	}
 
 	parser := expfmt.NewTextParser(model.NameValidationScheme)
 	mfs, err := parser.TextToMetricFamilies(resp.Body)
 	if err != nil && len(mfs) == 0 {
-		return entities.Metrics{}, fmt.Errorf("prometheus: parse error: %w", err)
+		return entities.Metrics{}, fmt.Errorf("exporter: parse error: %w", err)
 	}
 
 	metric := entities.Metrics{

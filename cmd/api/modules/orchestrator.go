@@ -13,6 +13,7 @@ func OrchestratorFactories() fx.Option {
 	return fx.Provide(
 		consumemessage.NewConsumeMessageUseCase,
 		orchestrator.NewOrchestrator,
+		targets.NewSQLClient,
 		targets.NewTarget,
 	)
 }

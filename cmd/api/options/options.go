@@ -22,9 +22,17 @@ func Options() fx.Option {
 		modules.MetricsLifecycle(),
 
 		modules.QueueFactories(),
+		modules.QueueInjections(),
+		modules.QueueEndpoints(),
+		modules.QueueLifecycle(),
 
 		modules.OrchestratorFactories(),
 		modules.OrchestratorInjections(),
+
+		modules.DisturbanceFactories(),
+		modules.DisturbanceInjections(),
+		modules.DisturbanceEndpoints(),
+		modules.DisturbanceLifecycle(),
 
 		modules.MetricsPollerFactories(),
 		modules.MetricsPollerInjections(),

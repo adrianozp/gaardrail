@@ -262,6 +262,27 @@
       <select id="qtype" onchange="switchQueue(this.value)"></select>
       <div id="queue-config"></div>
     </div>
+
+    <div class="section divided">
+      <div class="label">Perturbação</div>
+      <div class="field">
+        <label>query</label>
+        <input type="text" id="dist-query" placeholder="SELECT SLEEP(0.01)">
+      </div>
+      <div class="field">
+        <label>rate (queries/s, 0 = parar)</label>
+        <input type="number" id="dist-rate" step="any" min="0" value="0">
+      </div>
+      <div class="field">
+        <label>duração (s, 0 = até parar)</label>
+        <input type="number" id="dist-duration" step="any" min="0" value="0">
+      </div>
+      <div class="row">
+        <button class="btn-save" onclick="applyDisturbance()">✓ aplicar</button>
+        <button class="btn-ghost" onclick="stopDisturbance()" title="parar">■ parar</button>
+      </div>
+      <span id="dist-msg" class="msg"></span>
+    </div>
   </aside>
 
   <div id="grafana">
@@ -547,6 +568,70 @@
       el.style.color = color;
     }
 
+    // ---- Disturbance ----
+
+    async function loadDisturbance() {
+      try {
+        const res = await fetch('/disturbance');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.query) document.getElementById('dist-query').value = data.query;
+        document.getElementById('dist-rate').value = data.rate || 0;
+        document.getElementById('dist-duration').value = data.duration_seconds || 0;
+      } catch (_) {}
+    }
+
+    async function postDisturbance(body) {
+      try {
+        const res = await fetch('/disturbance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          distMsg(data.error || `Erro ${res.status}`, '#da3633');
+          return false;
+        }
+        return true;
+      } catch (_) {
+        distMsg('Erro de rede', '#da3633');
+        return false;
+      }
+    }
+
+    async function applyDisturbance() {
+      const query = document.getElementById('dist-query').value;
+      const rate = parseFloat(document.getElementById('dist-rate').value);
+      const duration = parseFloat(document.getElementById('dist-duration').value);
+      if (!query) { distMsg('query obrigatória', '#da3633'); return; }
+      if (isNaN(rate) || rate < 0) { distMsg('rate inválido', '#da3633'); return; }
+
+      const ok = await postDisturbance({
+        query,
+        rate,
+        duration_seconds: isNaN(duration) ? 0 : duration,
+      });
+      if (ok) distMsg(rate > 0 ? '✓ aplicada' : '✓ parada', '#238636');
+    }
+
+    async function stopDisturbance() {
+      // rate 0 stops the disturbance; query is still required by the API.
+      const query = document.getElementById('dist-query').value || 'SELECT 1';
+      const ok = await postDisturbance({ query, rate: 0, duration_seconds: 0 });
+      if (ok) {
+        document.getElementById('dist-rate').value = 0;
+        distMsg('✓ parada', '#238636');
+      }
+    }
+
+    function distMsg(msg, color) {
+      const el = document.getElementById('dist-msg');
+      if (!el) return;
+      el.textContent = msg;
+      el.style.color = color;
+    }
+
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') closeDrawer();
       if (e.key === 'Enter' && drawerOpen && e.target.id && e.target.id.startsWith('input-')) saveParams();
@@ -554,6 +639,7 @@
 
     loadParams();
     loadQueue();
+    loadDisturbance();
   </script>
 </body>
 </html>

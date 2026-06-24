@@ -2,10 +2,12 @@ package switchable
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/adrianozp/gaardrail/app/entities"
+	"github.com/adrianozp/gaardrail/app/repositories/queue"
 	"github.com/adrianozp/gaardrail/app/repositories/queue/constant"
 	"github.com/adrianozp/gaardrail/pkg/config"
 	"github.com/stretchr/testify/assert"
@@ -20,43 +22,91 @@ func newQueue(t *testing.T, active string) *Queue {
 	return q
 }
 
+// fakeQueue is a minimal queue whose Dequeue blocks until the context is done,
+// used to drive lazy-construction tests without external dependencies.
+type fakeQueue struct{ name string }
+
+func (f *fakeQueue) Enqueue(entities.Message) (string, error) { return "", nil }
+func (f *fakeQueue) Dequeue(ctx context.Context) (entities.Message, error) {
+	<-ctx.Done()
+	return entities.Message{}, ctx.Err()
+}
+func (f *fakeQueue) Ack(context.Context, entities.Message) error { return nil }
+func (f *fakeQueue) Size() (int64, error)                        { return 0, nil }
+
+// rawQueue builds a Queue with custom constructors for white-box lazy tests.
+func rawQueue(t *testing.T, active string, ctors map[string]func() (queue.Queue, error)) *Queue {
+	t.Helper()
+	q := &Queue{
+		switched:     make(chan struct{}),
+		built:        map[string]queue.Queue{},
+		constructors: ctors,
+	}
+	inst, err := q.instance(active)
+	require.NoError(t, err)
+	q.active = inst
+	q.activeType = active
+	return q
+}
+
 func TestNew_SelectsConfiguredQueue(t *testing.T) {
 	q := newQueue(t, "constant")
 	assert.Equal(t, "constant", q.Type())
 }
 
 func TestNew_UnknownTypeErrors(t *testing.T) {
-	cfg := config.Config{Queue: config.Queue{Protocol: "kafka"}}
+	cfg := config.Config{Queue: config.Queue{Protocol: "banana"}}
 	_, err := New(cfg, constant.New(cfg))
 	require.Error(t, err)
 }
 
-func TestAvailable_ListsSwitchableQueues(t *testing.T) {
+func TestAvailable_ListsAllSwitchableQueues(t *testing.T) {
 	q := newQueue(t, "inmemory")
-	assert.Equal(t, []string{"inmemory", "constant"}, q.Available())
+	assert.Equal(t, []string{"kafka", "inmemory", "constant", "sqs"}, q.Available())
 }
 
 func TestSetType_SwitchesActive(t *testing.T) {
 	q := newQueue(t, "inmemory")
-
 	require.NoError(t, q.SetType("constant"))
-
 	assert.Equal(t, "constant", q.Type())
 }
 
 func TestSetType_SameTypeIsNoOp(t *testing.T) {
 	q := newQueue(t, "inmemory")
-
 	require.NoError(t, q.SetType("inmemory"))
-
 	assert.Equal(t, "inmemory", q.Type())
 }
 
 func TestSetType_UnknownTypeErrorsAndKeepsActive(t *testing.T) {
 	q := newQueue(t, "inmemory")
-
 	require.Error(t, q.SetType("banana"))
 	assert.Equal(t, "inmemory", q.Type(), "active queue must be unchanged on error")
+}
+
+func TestSetType_BuildsLazilyAndCaches(t *testing.T) {
+	calls := 0
+	ctors := map[string]func() (queue.Queue, error){
+		"a": func() (queue.Queue, error) { return &fakeQueue{"a"}, nil },
+		"b": func() (queue.Queue, error) { calls++; return &fakeQueue{"b"}, nil },
+	}
+	q := rawQueue(t, "a", ctors)
+
+	require.NoError(t, q.SetType("b"))
+	require.NoError(t, q.SetType("a"))
+	require.NoError(t, q.SetType("b"))
+
+	assert.Equal(t, 1, calls, "b must be constructed once and reused from cache")
+}
+
+func TestSetType_ConstructorErrorKeepsActive(t *testing.T) {
+	ctors := map[string]func() (queue.Queue, error){
+		"a":   func() (queue.Queue, error) { return &fakeQueue{"a"}, nil },
+		"bad": func() (queue.Queue, error) { return nil, errors.New("connect failed") },
+	}
+	q := rawQueue(t, "a", ctors)
+
+	require.Error(t, q.SetType("bad"), "a failed construction must surface as an error")
+	assert.Equal(t, "a", q.Type(), "active queue must be unchanged when construction fails")
 }
 
 func TestEnqueueSize_DelegateToActive(t *testing.T) {
@@ -91,7 +141,7 @@ func TestDequeue_UnparkedOnSwitch(t *testing.T) {
 		done <- string(m.Body)
 	}()
 
-	time.Sleep(20 * time.Millisecond) // let the goroutine park on the empty queue
+	time.Sleep(20 * time.Millisecond)
 	require.NoError(t, q.SetType("constant"))
 
 	select {

@@ -16,6 +16,7 @@ func Options() fx.Option {
 	return fx.Options(
 		fx.Provide(
 			config.Load,
+			config.NewPersister,
 			httpserver.New,
 		),
 

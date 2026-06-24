@@ -22,6 +22,10 @@ type Config struct {
 	PID           PID           `mapstructure:"pid"`
 	Orchestrator  Orchestrator  `mapstructure:"orchestrator"`
 	Grafana       Grafana       `mapstructure:"grafana"`
+
+	// Path is the resolved config file used at load time, set after reading. It
+	// is the target for runtime persistence and is not bound to any yaml key.
+	Path string `mapstructure:"-"`
 }
 
 // envKeys is populated by each domain file's init() before Load() is ever called.
@@ -59,6 +63,8 @@ func Load() (Config, error) {
 	if err := validate.Struct(cfg); err != nil {
 		return Config{}, err
 	}
+
+	cfg.Path = viper.ConfigFileUsed()
 
 	return cfg, nil
 }

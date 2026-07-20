@@ -94,6 +94,18 @@ curl -X PATCH http://localhost:8080/pid \
 
 Changing any parameter resets the integral accumulator to prevent windup artifacts from the previous gains.
 
+### Controller types
+
+The active controller is selected by `controller.type` and can be switched at runtime with `PUT /controller/type` (body `{"type": "..."}`):
+
+| Type | Description |
+|------|-------------|
+| `pid` | Discrete PI (feedforward off) — the production baseline. |
+| `pidff` | Same PI with feedforward (`u_ff = setpoint/ff_gain`). |
+| `smith` | Smith predictor (PI + internal FOPDT model) for dead-time compensation. |
+| `step` | Open-loop constant output (`max`), used for identification experiments. |
+| `autopid` | **Self-tuning**: on activation runs an open-loop step, identifies a FOPDT model (two-point Smith method), computes the gains automatically (AMIGO or SIMC, `autopid.tuning_rule`) and closes the loop with an embedded PID. Removes the manual offline tuning step. |
+
 ---
 
 ## Message consumption

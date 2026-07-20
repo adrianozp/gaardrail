@@ -29,4 +29,17 @@ type ControllerParams struct {
 	Max      *float64
 	IClamp   *float64
 	Setpoint *float64
+
+	// FilterSize is the moving-average window on the measurement (all controllers).
+	FilterSize *int
+
+	// FfGain is the plant static gain K used for feedforward: u_ff = setpoint/K.
+	// Zero disables feedforward. (PID controller.)
+	FfGain *float64
+
+	// Smith predictor internal FOPDT model (nil for other controllers).
+	ModelK        *float64
+	ModelTau      *float64
+	ModelTheta    *float64
+	SampleSeconds *float64
 }

@@ -20,6 +20,8 @@ type Config struct {
 	MetricsPoller MetricsPoller `mapstructure:"metrics_poller"`
 	Controller    Controller    `mapstructure:"controller"`
 	PID           PID           `mapstructure:"pid"`
+	Smith         Smith         `mapstructure:"smith"`
+	AutoPID       AutoPID       `mapstructure:"autopid"`
 	Orchestrator  Orchestrator  `mapstructure:"orchestrator"`
 	Grafana       Grafana       `mapstructure:"grafana"`
 

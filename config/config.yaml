@@ -1,51 +1,71 @@
 http:
   addr: ":8080"
-
 queue:
-  protocol: kafka
+  protocol: constant # fila constante: dispensa o Kafka, emite sempre a mesma query
   capacity: 1000
-
+  query: "SELECT id, val, score FROM flood_data ORDER BY RAND() LIMIT 100"
 kafka:
   brokers:
     - "localhost:9092"
   topic: "messages"
   partition: 0
   group_id: "gaardrail"
-
 target:
   protocol: sql
   driver: mysql
   dsn: "root:root@tcp(localhost:3306)/gaardrail"
   tls:
-    enabled: false      # true: criptografa a conexão com o banco (apenas mysql)
-    skip_verify: false  # true: criptografa sem verificar o certificado do servidor (cert autoassinado / testes)
-    ca_file: ""         # opcional: bundle CA em PEM para verificação completa do servidor
-    server_name: ""     # opcional: nome usado na verificação do certificado
-
+    enabled: false # true: criptografa a conexão com o banco (apenas mysql)
+    skip_verify: false # true: criptografa sem verificar o certificado do servidor (cert autoassinado / testes)
+    ca_file: "" # opcional: bundle CA em PEM para verificação completa do servidor
+    server_name: "" # opcional: nome usado na verificação do certificado
 metrics_poller:
   enabled: true
-  interval_ms: 1000
+  interval_ms: 5000 # T=5s (produção: 60000 — CloudWatch/Azure/GCP)
   protocol: prometheusapi
   endpoint: "http://localhost:9090/api/v1/query"
   mappings:
-    'irate(container_cpu_usage_seconds_total{container_label_com_docker_compose_service="mysql"}[1m])*100': cpu
-
+    # VALOR CRU (como um provedor real entrega): irate = taxa dos 2 ultimos pontos.
+    # A suavizacao fica no controlador (filter_size). Janela >= 3x scrape p/ >=2
+    # amostras: [15s] com scrape de 5s ([3m] com scrape de 60s, [1m] com 1s).
+    'irate(container_cpu_usage_seconds_total{container_label_com_docker_compose_service="mysql"}[15s])*100': cpu
 controller:
-  type: step
-
+  type: "pidff"
 orchestrator:
   rate: 0
   workers: 1
   burst: 5
-
 grafana:
   url: "http://localhost:3000/d/flood-test/flood-test?kiosk"
-
-pid:
+pid: # PIFF baseline T=10s (PI documentado campanha regime-10s, truncado na 3a casa)
+  setpoint: 50
+  kp: 0.058
+  ki: 0.009
+  kd: 0
+  min: 0
+  max: 50 # folga acima da drenagem de regime ~22 p/ setpoint 50%
+  i_clamp: 40 # integral precisa alcançar a drenagem de regime (forma posicional)
+  filter_size: 1 # metrica crua (o remédio do overshoot é o soft-start na referência)
+  ff_gain: 2.389 # feedforward u_ff=setpoint/K (K=ganho estatico documentado T=10s) -> 0 desliga
+  setpoint_filter_tau: 10 # soft-start ~2T (T=5s)
+smith:
   setpoint: 50.0
-  kp: 0.005
-  ki: 0.00
-  kd: 0.00
+  kp: 0.042283 # gentil e estavel (exp.12, ts=240s) — ganhos altos oscilam em T=60s
+  ki: 0.00781074
   min: 0.0
-  max: 5.0
-  i_clamp: 1
+  max: 40
+  i_clamp: 40
+  model_k: 2.47465 # ganho estático do FOPDT identificado (%CPU por msg/s)
+  model_tau: 33.1391 # constante de tempo (s)
+  model_theta: 61.74 # atraso EFETIVO (theta continuo + ~T de ZOH/amostragem) -> d=1 amostra
+  sample_seconds: 5.0 # período de amostragem T (60.0 produção)
+  filter_size: 1 # metrica crua a 60s ja e media de ~1300 queries/min; sem MA extra
+autopid: # auto-sintonia: degrau em malha aberta -> FOPDT (2 pontos) -> ganhos automaticos
+  tuning_rule: amigo # amigo (Astrom-Hagglund) | simc (Skogestad)
+  mode: pi # pi | pid (variante da regra; producao roda PI)
+  tau_c: 0 # SIMC: constante de tempo desejada em MF (s); 0 => usa theta_eff (robusto)
+  baseline_output: 0 # drenagem na linha de base; 0 => pid.min
+  step_output: 0 # drenagem durante o degrau; 0 => pid.max
+  baseline_seconds: 120 # duração da baseline antes do degrau
+  identify_seconds: 600 # duração do degrau (~10 amostras a T=60s)
+  # limites de operação (min/max/i_clamp/setpoint/filter_size) herdados de pid.*

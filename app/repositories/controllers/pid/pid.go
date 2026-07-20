@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/adrianozp/gaardrail/app/entities"
+	"github.com/adrianozp/gaardrail/internal/filter"
 	metrics "github.com/adrianozp/gaardrail/internal/metrics"
 	"github.com/adrianozp/gaardrail/pkg/config"
 )
@@ -21,12 +22,20 @@ type Controller struct {
 	// IClamp is the anti-windup bound for the integral term.
 	// Should be <= Max for correct saturation behavior.
 	IClamp float64
+	// Kff is the plant static gain used for feedforward (u_ff = setpoint/Kff).
+	// Zero disables feedforward; the feedforward sets the operating point so the
+	// integral does not have to ramp up to it (removes setpoint overshoot).
+	Kff float64
 
 	setpoint    float64
 	i           float64
 	prevE       float64
 	first       bool
 	lastCompute time.Time
+	filter      *filter.MovingAverage
+	// Setpoint filter: 1st-order prefilter on the reference (pure setpoint signal).
+	spFilterTau float64
+	spFiltered  float64
 }
 
 type ControllerParams struct {
@@ -53,9 +62,12 @@ func New(cfg config.Config) *Controller {
 		Kd:       cfg.PID.Kd,
 		Min:      cfg.PID.Min,
 		Max:      cfg.PID.Max,
-		IClamp:   cfg.PID.IClamp,
-		first:    true,
-		setpoint: cfg.PID.Setpoint,
+		IClamp:      cfg.PID.IClamp,
+		Kff:         cfg.PID.FfGain,
+		first:       true,
+		setpoint:    cfg.PID.Setpoint,
+		filter:      filter.NewMovingAverage(cfg.PID.FilterSize),
+		spFilterTau: cfg.PID.SetpointFilterTau,
 	}
 }
 
@@ -78,28 +90,64 @@ func (c *Controller) Compute(measured float64, measureTime time.Time) (float64, 
 		return 0, err
 	}
 
-	e := c.setpoint - measured
+	// Smooth the (noisy) measurement before the control law.
+	measured = c.filter.Filter(measured)
+
+	// Setpoint filter: a referência efetiva persegue o setpoint por um 1º ordem,
+	// evitando o degrau que satura o atuador. É PURO no sinal de setpoint — não
+	// olha a medição (rampa do valor anterior, 0 no boot, até o setpoint). Não
+	// afeta a rejeição de perturbação (só molda a referência).
+	spEff := c.setpoint
+	if c.spFilterTau > 0 {
+		a := math.Exp(-dt / c.spFilterTau)
+		c.spFiltered = a*c.spFiltered + (1-a)*c.setpoint
+		spEff = c.spFiltered
+	}
+
+	e := spEff - measured
 
 	p := c.Kp * e
-	c.i = clamp(c.i+c.Ki*e*dt, -c.IClamp, c.IClamp)
 
 	d := 0.0
 	if !c.first && dt > 0 {
 		d = c.Kd * (e - c.prevE) / dt
 	}
+
+	// Feedforward: sets the nominal operating point (u_ff = setpoint/K) so the
+	// integral only trims model error / disturbances instead of ramping up.
+	ff := 0.0
+	if c.Kff > 0 {
+		ff = spEff / c.Kff
+	}
+
+	// Integrate with conditional anti-windup: bound the integral to the band that
+	// keeps the (unclamped) output off the saturation rails, and also to IClamp.
+	// This stops windup during saturation (large setpoint steps, feedforward),
+	// which is what caused the overshoot with a plain integral clamp.
+	c.i += c.Ki * e * dt
+	lo := math.Max(-c.IClamp, c.Min-ff-p-d)
+	hi := math.Min(c.IClamp, c.Max-ff-p-d)
+	if lo <= hi {
+		c.i = clamp(c.i, lo, hi)
+	} else {
+		c.i = clamp(c.i, -c.IClamp, c.IClamp)
+	}
+
 	c.first = false
 	c.prevE = e
 	c.lastCompute = measureTime
 
-	output := clamp(p+c.i+d, c.Min, c.Max)
+	output := clamp(ff+p+c.i+d, c.Min, c.Max)
 
 	metrics.Gauge(map[string]float64{
-		"pid_setpoint": c.setpoint,
+		"pid_setpoint": spEff,
+		"pid_measured": measured,
 		"pid_error":    e,
 		"pid_p_term":   p,
 		"pid_i_term":   c.i,
 		"pid_d_term":   d,
-		"pid_output":   p + c.i + d,
+		"pid_ff_term":  ff,
+		"pid_output":   ff + p + c.i + d,
 		"pid_kp":       c.Kp,
 		"pid_ki":       c.Ki,
 		"pid_kd":       c.Kd,
@@ -117,15 +165,19 @@ func (c *Controller) GetParams() entities.ControllerParams {
 
 	kp, ki, kd := c.Kp, c.Ki, c.Kd
 	min, max, iclamp, setpoint := c.Min, c.Max, c.IClamp, c.setpoint
+	fsize := c.filter.Size()
+	kff := c.Kff
 
 	return entities.ControllerParams{
-		Kp:       &kp,
-		Ki:       &ki,
-		Kd:       &kd,
-		Min:      &min,
-		Max:      &max,
-		IClamp:   &iclamp,
-		Setpoint: &setpoint,
+		Kp:         &kp,
+		Ki:         &ki,
+		Kd:         &kd,
+		Min:        &min,
+		Max:        &max,
+		IClamp:     &iclamp,
+		Setpoint:   &setpoint,
+		FilterSize: &fsize,
+		FfGain:     &kff,
 	}
 }
 
@@ -155,6 +207,9 @@ func (c *Controller) SetParams(p entities.ControllerParams) error {
 	}
 	if p.Setpoint != nil {
 		c.setpoint = *p.Setpoint
+	}
+	if p.FfGain != nil {
+		c.Kff = *p.FfGain
 	}
 
 	if c.Min > c.Max {
@@ -194,6 +249,8 @@ func (c *Controller) Reset() {
 	c.prevE = 0
 	c.first = true
 	c.lastCompute = time.Time{}
+	c.filter.Reset()
+	c.spFiltered = 0
 }
 
 func (c *Controller) Type() string { return "pid" }

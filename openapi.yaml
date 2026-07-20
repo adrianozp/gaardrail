@@ -120,7 +120,7 @@ paths:
 
   /controller/type:
     put:
-      summary: Troca o controlador ativo em runtime (pid ↔ step)
+      summary: Troca o controlador ativo em runtime (pid, pidff, step, smith)
       operationId: switchController
       tags: [PID]
       requestBody:
@@ -169,7 +169,7 @@ components:
       properties:
         type:
           type: string
-          enum: [pid, step]
+          enum: [pid, pidff, step, smith]
           description: Tipo do controlador atualmente ativo
         kp:
           type: number
@@ -203,6 +203,26 @@ components:
           type: integer
           minimum: 1
           description: Tamanho da janela do filtro de média móvel (1 = sem filtro)
+        ff_gain:
+          type: number
+          format: double
+          description: "Ganho estático K para feedforward (u_ff=setpoint/K); 0 desliga"
+        model_k:
+          type: number
+          format: double
+          description: "Smith: ganho estático do modelo interno FOPDT (somente leitura)"
+        model_tau:
+          type: number
+          format: double
+          description: "Smith: constante de tempo do modelo interno (s, somente leitura)"
+        model_theta:
+          type: number
+          format: double
+          description: "Smith: atraso de transporte do modelo interno (s, somente leitura)"
+        sample_seconds:
+          type: number
+          format: double
+          description: "Smith: período de amostragem do buffer de atraso (s, somente leitura)"
 
     SwitchControllerRequest:
       type: object
@@ -210,7 +230,7 @@ components:
       properties:
         type:
           type: string
-          enum: [pid, step]
+          enum: [pid, pidff, step, smith]
           description: Tipo do controlador a ativar
 
     UpdatePIDParamsRequest:
@@ -242,6 +262,10 @@ components:
           type: integer
           minimum: 1
           description: Tamanho da janela do filtro de média móvel (1 = sem filtro)
+        ff_gain:
+          type: number
+          format: double
+          description: "Ganho estático K para feedforward (u_ff=setpoint/K); 0 desliga"
 
     ErrorResponse:
       type: object

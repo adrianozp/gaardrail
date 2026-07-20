@@ -67,14 +67,27 @@ func (o *Orchestrator) worker() {
 		}
 
 		if o.Limiter().Limit() == 0 {
-			log.Info().Msg("orchestrator: limiter not set waiting")
+			log.Info().Msg("orchestrator: drain rate is 0, waiting")
 			time.Sleep(1 * time.Second)
 			continue
 		}
 
-		if err := o.limiter.Wait(o.ctx); err != nil {
-			log.Warn().Err(err).Msg("orchestrator: rate limiter error, retrying")
+		// Reserve (not Wait) so a live SetDrainRate change is always picked up.
+		// If the drain rate drops (or hits 0) while a worker is blocked in
+		// Wait, the limiter keeps sleeping on the stale near-infinite delay and
+		// never recovers when the rate is raised again. Reserve lets us cap the
+		// sleep and re-evaluate the current limit each iteration.
+		r := o.limiter.Reserve()
+		if !r.OK() {
 			continue
+		}
+		if delay := r.Delay(); delay > 0 {
+			if delay > time.Second {
+				r.Cancel()
+				time.Sleep(time.Second)
+				continue
+			}
+			time.Sleep(delay)
 		}
 
 		if _, err := o.consumer.Consume(o.ctx); err != nil {

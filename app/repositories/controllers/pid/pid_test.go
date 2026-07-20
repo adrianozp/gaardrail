@@ -82,6 +82,30 @@ func TestDerivative(t *testing.T) {
 	}
 }
 
+func TestFeedforward(t *testing.T) {
+	// Kp=Ki=Kd=0, feedforward only: u_ff = setpoint/Kff = 50/2.5 = 20.
+	c := pid.New(config.Config{PID: config.PID{Max: 100, IClamp: 20, Setpoint: 50, FfGain: 2.5}})
+	out, err := c.Compute(0, t0.Add(1*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if math.Abs(out-20.0) > 0.001 {
+		t.Errorf("expected feedforward 20.0, got %f", out)
+	}
+}
+
+func TestFeedforwardDisabledWhenZero(t *testing.T) {
+	// FfGain=0 -> no feedforward; pure proportional: out = Kp*e = 1*(50-0) clamp.
+	c := pid.New(cfg(1.0, 0, 0, 0, 100, 20, 50.0))
+	out, err := c.Compute(0, t0.Add(1*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if math.Abs(out-50.0) > 0.001 {
+		t.Errorf("expected 50.0 (no feedforward), got %f", out)
+	}
+}
+
 func TestReset(t *testing.T) {
 	c := pid.New(cfg(1.0, 1.0, 1.0, 0, 100, 20, 15.0))
 	c.Compute(5.0, t0.Add(5*time.Second))

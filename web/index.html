@@ -243,8 +243,16 @@
       <div class="label">Controlador</div>
       <select id="ctype" onchange="switchController(this.value)">
         <option value="pid">pid</option>
+        <option value="pidff">pid + feedforward</option>
         <option value="step">step</option>
+        <option value="smith">smith</option>
       </select>
+      <div id="ctrl-active" class="summary" style="margin-top:6px"></div>
+    </div>
+
+    <div class="section divided">
+      <div class="label">Aquisição (polling)</div>
+      <div id="poll-info" data-interval="{{POLL_INTERVAL_MS}}" data-query="{{POLL_QUERY}}"></div>
     </div>
 
     <div class="section divided">
@@ -290,14 +298,22 @@
   </div>
 
   <script>
-    const FIELDS = ['setpoint', 'kp', 'ki', 'kd', 'min', 'max', 'i_clamp'];
+    const FIELDS = ['setpoint', 'kp', 'ki', 'kd', 'min', 'max', 'i_clamp', 'ff_gain'];
+    // Smith is a PI (no derivative) + internal model; the model fields below are
+    // read-only (set via config from the identification, shown for insight).
+    const SMITH_FIELDS = ['setpoint', 'kp', 'ki', 'min', 'max', 'i_clamp'];
+    const SMITH_MODEL = ['model_k', 'model_tau', 'model_theta', 'sample_seconds', 'filter_size'];
     let current = {};            // controller params from /pid
     let queue = { type: 'inmemory', available: [] };
     let drawerOpen = false;
 
-    // The step controller only has a single tunable output: max.
+    // Editable fields per controller type. 'pid' hides ff_gain (pure PI);
+    // 'pidff' shows the full set including ff_gain.
     function activeFields() {
-      return current.type === 'step' ? ['max'] : FIELDS;
+      if (current.type === 'step') return ['max'];
+      if (current.type === 'smith') return SMITH_FIELDS;
+      if (current.type === 'pid') return FIELDS.filter(f => f !== 'ff_gain');
+      return FIELDS; // pidff
     }
 
     function toggleDrawer() { drawerOpen ? closeDrawer() : openDrawer(); }
@@ -322,6 +338,8 @@
         if (current.type) document.getElementById('ctype').value = current.type;
         renderParams();
         renderSummary();
+        document.getElementById('ctrl-active').innerHTML =
+          `<span class="k">controlador ativo</span> <span class="type">${current.type || '—'}</span>`;
         setDrawerClass('');
       } catch (_) {
         document.getElementById('params').innerHTML =
@@ -330,7 +348,7 @@
     }
 
     function renderParams() {
-      document.getElementById('params').innerHTML =
+      let html =
         `<div class="params-grid">` + activeFields().map(f => `
           <div class="pfield">
             <label>${f}</label>
@@ -338,6 +356,18 @@
                    value="${current[f] !== undefined ? current[f] : 0}">
           </div>
         `).join('') + `</div>`;
+
+      // Smith: mostra o modelo interno FOPDT (somente leitura).
+      if (current.type === 'smith') {
+        html += `<div class="label" style="margin-top:10px">Modelo do preditor (somente leitura)</div>`
+          + `<div class="params-grid">` + SMITH_MODEL.map(f => `
+            <div class="pfield">
+              <label>${f}</label>
+              <input type="number" step="any" value="${current[f] !== undefined ? current[f] : '—'}" disabled>
+            </div>
+          `).join('') + `</div>`;
+      }
+      document.getElementById('params').innerHTML = html;
     }
 
     function renderSummary() {
@@ -637,6 +667,19 @@
       if (e.key === 'Enter' && drawerOpen && e.target.id && e.target.id.startsWith('input-')) saveParams();
     });
 
+    function renderPoll() {
+      const el = document.getElementById('poll-info');
+      if (!el) return;
+      const ms = parseInt(el.dataset.interval, 10);
+      const q = el.dataset.query || '';
+      const human = isNaN(ms) ? '—' : (ms >= 1000 ? `${ms} ms (${ms / 1000} s)` : `${ms} ms`);
+      el.innerHTML =
+        `<div class="summary"><span class="k">intervalo</span> <span class="v">${human}</span></div>`
+        + (q ? `<div class="pfield" style="margin-top:6px"><label>query da medição (CPU)</label>`
+             + `<input type="text" value="${q.replace(/"/g, '&quot;')}" disabled></div>` : '');
+    }
+
+    renderPoll();
     loadParams();
     loadQueue();
     loadDisturbance();

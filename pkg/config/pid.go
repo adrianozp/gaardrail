@@ -9,8 +9,15 @@ type PID struct {
 	IClamp     float64 `mapstructure:"i_clamp"     default:"100.0"`
 	Setpoint   float64 `mapstructure:"setpoint"    default:"70.0"`
 	FilterSize int     `mapstructure:"filter_size" default:"1"`
+	// FfGain is the plant static gain K for feedforward (u_ff = setpoint/K).
+	// 0 disables feedforward.
+	FfGain float64 `mapstructure:"ff_gain" default:"0"`
+	// SetpointFilterTau is the time constant (s) of a 1st-order filter on the
+	// setpoint (soft-start / reference prefilter). 0 = instant setpoint (degrau).
+	// Reduz o sobressinal de partida sem afetar a rejeição de perturbação.
+	SetpointFilterTau float64 `mapstructure:"setpoint_filter_tau" default:"0"`
 }
 
 func init() {
-	envKeys = append(envKeys, "pid.kp", "pid.ki", "pid.kd", "pid.min", "pid.max", "pid.i_clamp", "pid.setpoint", "pid.filter_size")
+	envKeys = append(envKeys, "pid.kp", "pid.ki", "pid.kd", "pid.min", "pid.max", "pid.i_clamp", "pid.setpoint", "pid.filter_size", "pid.ff_gain", "pid.setpoint_filter_tau")
 }

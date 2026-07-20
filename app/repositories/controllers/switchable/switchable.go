@@ -12,7 +12,9 @@ import (
 
 	"github.com/adrianozp/gaardrail/app/entities"
 	"github.com/adrianozp/gaardrail/app/repositories/controllers"
+	"github.com/adrianozp/gaardrail/app/repositories/controllers/autopid"
 	"github.com/adrianozp/gaardrail/app/repositories/controllers/pid"
+	"github.com/adrianozp/gaardrail/app/repositories/controllers/smith"
 	"github.com/adrianozp/gaardrail/app/repositories/controllers/step"
 	"github.com/adrianozp/gaardrail/pkg/config"
 )
@@ -29,9 +31,17 @@ type Controller struct {
 // New builds every available controller and selects the one named by
 // cfg.Controller.Type. Returns an error for an unknown type.
 func New(cfg config.Config) (*Controller, error) {
+	// "pid" is pure PI (feedforward forced off); "pidff" is the same PI with the
+	// feedforward enabled from config (u_ff = setpoint/ff_gain). Both share the
+	// PID implementation so they behave identically apart from the feedforward.
+	cfgNoFF := cfg
+	cfgNoFF.PID.FfGain = 0
 	available := map[string]controllers.Controller{
-		"pid":  pid.New(cfg),
-		"step": step.NewStep(cfg),
+		"pid":     pid.New(cfgNoFF),
+		"pidff":   pid.New(cfg),
+		"step":    step.NewStep(cfg),
+		"smith":   smith.New(cfg),
+		"autopid": autopid.New(cfg),
 	}
 
 	active, ok := available[cfg.Controller.Type]

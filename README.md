@@ -68,7 +68,9 @@ output(t) = clamp(P + I + D,  Min,  Max)
 
 The output is the new **drain rate** in messages/second, clamped to `[Min, Max]`.
 
-Before the measured value reaches the PID, it passes through a **moving average filter** of configurable size (`filter_size`). A size of `1` disables filtering (pass-through). Larger values smooth out noisy metrics at the cost of additional lag.
+Two configurable filters shape the loop's signals. The **measurement filter** lives on the metrics chain (`metrics_poller.filter_type` / `filter_size`) and smooths the process variable before it reaches whichever controller is active — since identification reads the same filtered gauge, the filter is absorbed into the identified model. The **setpoint filter** is per controller (`setpoint_filter_type` / `setpoint_filter_size`) and turns setpoint changes into a gradual trajectory, removing startup overshoot.
+
+Both accept the types `none`, `moving_average` and `exponential`, with sizes in samples: a moving-average setpoint filter turns a step into a linear ramp that completes in exactly N samples; the exponential type is a first-order lag with a time constant of N samples (`a = e^(−1/N)`). The legacy `setpoint_filter_tau` (seconds) is still honored and maps to the equivalent exponential.
 
 | Parameter | Role |
 |-----------|------|
@@ -78,7 +80,8 @@ Before the measured value reaches the PID, it passes through a **moving average 
 | `IClamp` | Anti-windup bound on the integral accumulator |
 | `setpoint` | Target resource utilization (e.g. `50.0` for 50% CPU) |
 | `Min / Max` | Output clamp — drain rate bounds in msgs/s |
-| `filter_size` | Moving average window size (`1` = no filter) |
+| `setpoint_filter_type` | Setpoint filter: `none`, `moving_average` or `exponential` |
+| `setpoint_filter_size` | Setpoint filter size, in samples |
 
 Parameters can be read and updated at runtime without restarting:
 
@@ -171,7 +174,8 @@ pid:
   min: 0.0         # minimum drain rate (msgs/s)
   max: 10.0        # maximum drain rate (msgs/s)
   i_clamp: 5.0     # integral anti-windup bound
-  filter_size: 1   # moving average window (1 = no filter)
+  setpoint_filter_type: exponential   # none | moving_average | exponential
+  setpoint_filter_size: 2             # in samples
 
 orchestrator:
   workers: 1       # parallel consumer goroutines
@@ -182,6 +186,8 @@ metrics_poller:
   interval_ms: 1000
   protocol: prometheusapi
   endpoint: "http://localhost:9090/api/v1/query"
+  filter_type: none    # measurement filter: none | moving_average | exponential
+  filter_size: 1       # in samples
   mappings:
     'irate(container_cpu_usage_seconds_total{...}[1m])*100': cpu
 ```
@@ -268,7 +274,8 @@ curl -X PATCH http://localhost:8080/pid \
     "min": 0.0,
     "max": 10.0,
     "i_clamp": 5.0,
-    "filter_size": 1
+    "setpoint_filter_type": "moving_average",
+    "setpoint_filter_size": 4
   }'
 ```
 
@@ -281,5 +288,6 @@ curl -X PATCH http://localhost:8080/pid \
 | `min` | float | Minimum drain rate (msgs/s) |
 | `max` | float | Maximum drain rate (msgs/s) |
 | `i_clamp` | float | Anti-windup bound on the integral accumulator |
-| `filter_size` | int | Moving average window size (`1` = no filter, `>= 1`) |
+| `setpoint_filter_type` | string | Setpoint filter: `none`, `moving_average` or `exponential` |
+| `setpoint_filter_size` | int | Setpoint filter size, in samples (`>= 1`) |
 

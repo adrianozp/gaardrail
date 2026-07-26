@@ -86,7 +86,8 @@ paths:
                 max: 100.0
                 i_clamp: 10.0
                 setpoint: 50.0
-                filter_size: 1
+                setpoint_filter_type: moving_average
+                setpoint_filter_size: 4
 
     patch:
       summary: Atualiza parcialmente os parâmetros do controlador PID
@@ -101,7 +102,7 @@ paths:
             example:
               kp: 1.2
               setpoint: 60.0
-              filter_size: 5
+              setpoint_filter_size: 5
       responses:
         "204":
           description: Parâmetros atualizados com sucesso
@@ -199,10 +200,13 @@ components:
           type: number
           format: double
           description: Valor alvo para o controlador
-        filter_size:
+        setpoint_filter_type:
+          type: string
+          enum: [none, moving_average, exponential]
+          description: Tipo do filtro aplicado ao setpoint (referência) antes do controlador
+        setpoint_filter_size:
           type: integer
-          minimum: 1
-          description: Tamanho da janela do filtro de média móvel (1 = sem filtro)
+          description: Tamanho (em amostras) do filtro de setpoint
         ff_gain:
           type: number
           format: double
@@ -258,10 +262,13 @@ components:
         setpoint:
           type: number
           format: double
-        filter_size:
+        setpoint_filter_type:
+          type: string
+          enum: [none, moving_average, exponential]
+          description: Tipo do filtro aplicado ao setpoint (referência) antes do controlador
+        setpoint_filter_size:
           type: integer
-          minimum: 1
-          description: Tamanho da janela do filtro de média móvel (1 = sem filtro)
+          description: Tamanho (em amostras) do filtro de setpoint
         ff_gain:
           type: number
           format: double

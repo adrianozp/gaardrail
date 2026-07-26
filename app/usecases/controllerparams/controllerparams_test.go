@@ -31,8 +31,50 @@ func TestUpdate_PersistsSetpointFilterTypeAndSize(t *testing.T) {
 
 	ctrl := mocks.NewController(t)
 	ctrl.On("SetParams", params).Return(nil)
+	ctrl.On("GetParams").Return(entities.ControllerParams{SetpointFilterType: strptr("moving_average"), SetpointFilterSize: intptr(4)})
 	store := mocks.NewConfigStore(t)
 	store.On("Set", map[string]any{"pid.setpoint_filter_type": "moving_average", "pid.setpoint_filter_size": 4}).Return(nil)
+
+	uc := controllerparams.New(ctrl, store)
+
+	require.NoError(t, uc.Update(params))
+}
+
+func TestUpdate_FilterTypeOnly_PersistsEffectiveTypeAndSize(t *testing.T) {
+	params := entities.ControllerParams{SetpointFilterType: strptr("moving_average")}
+
+	ctrl := mocks.NewController(t)
+	ctrl.On("SetParams", params).Return(nil)
+	ctrl.On("GetParams").Return(entities.ControllerParams{SetpointFilterType: strptr("moving_average"), SetpointFilterSize: intptr(2)})
+	store := mocks.NewConfigStore(t)
+	store.On("Set", map[string]any{"pid.setpoint_filter_type": "moving_average", "pid.setpoint_filter_size": 2}).Return(nil)
+
+	uc := controllerparams.New(ctrl, store)
+
+	require.NoError(t, uc.Update(params))
+}
+
+func TestUpdate_FilterSizeOnly_PersistsEffectiveTypeAndSize(t *testing.T) {
+	params := entities.ControllerParams{SetpointFilterSize: intptr(4)}
+
+	ctrl := mocks.NewController(t)
+	ctrl.On("SetParams", params).Return(nil)
+	ctrl.On("GetParams").Return(entities.ControllerParams{SetpointFilterType: strptr("exponential"), SetpointFilterSize: intptr(4)})
+	store := mocks.NewConfigStore(t)
+	store.On("Set", map[string]any{"pid.setpoint_filter_type": "exponential", "pid.setpoint_filter_size": 4}).Return(nil)
+
+	uc := controllerparams.New(ctrl, store)
+
+	require.NoError(t, uc.Update(params))
+}
+
+func TestUpdate_UnrelatedFieldOnly_FilterKeysNotPersisted(t *testing.T) {
+	params := entities.ControllerParams{Kp: ptr(0.5)}
+
+	ctrl := mocks.NewController(t)
+	ctrl.On("SetParams", params).Return(nil)
+	store := mocks.NewConfigStore(t)
+	store.On("Set", map[string]any{"pid.kp": 0.5}).Return(nil)
 
 	uc := controllerparams.New(ctrl, store)
 

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/adrianozp/gaardrail/app/entities"
 	"github.com/adrianozp/gaardrail/app/repositories/controllers/pid"
 	"github.com/adrianozp/gaardrail/pkg/config"
 )
@@ -201,5 +202,75 @@ func TestLegacyTauViraExponencialEquivalente(t *testing.T) {
 	want := (1 - math.Exp(-0.5)) * 50
 	if math.Abs(out1-want) > 1e-6 {
 		t.Fatalf("tau=2T deve equivaler a size=2: got %v want %v", out1, want)
+	}
+}
+
+func TestSetParamsTrocaFiltroParaMovingAverageSemErro(t *testing.T) {
+	cfg := config.Config{PID: config.PID{Kp: 1, Max: 100, Min: -100, IClamp: 100,
+		Setpoint: 100, SetpointFilterType: "moving_average", SetpointFilterSize: 4}}
+	c := pid.New(cfg)
+	base := time.Now()
+	if _, err := c.Compute(0, base.Add(1*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+
+	kind, size := "moving_average", 8
+	if err := c.SetParams(entities.ControllerParams{SetpointFilterType: &kind, SetpointFilterSize: &size}); err != nil {
+		t.Fatalf("esperava trocar tipo/tamanho do filtro sem erro, got %v", err)
+	}
+}
+
+func TestSetParamsTrocaFiltroRampaDaReferenciaEfetivaAtual(t *testing.T) {
+	cfg := config.Config{PID: config.PID{Kp: 1, Max: 100, Min: -100, IClamp: 100,
+		Setpoint: 100, SetpointFilterType: "moving_average", SetpointFilterSize: 4}}
+	c := pid.New(cfg)
+	base := time.Now()
+	out0, err := c.Compute(0, base.Add(1*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if math.Abs(out0-25) > 1e-6 {
+		t.Fatalf("referência efetiva esperada 25 antes da troca de filtro, got %v", out0)
+	}
+
+	kind, size := "exponential", 4
+	if err := c.SetParams(entities.ControllerParams{SetpointFilterType: &kind, SetpointFilterSize: &size}); err != nil {
+		t.Fatal(err)
+	}
+
+	out1, err := c.Compute(0, base.Add(2*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := math.Exp(-1.0 / 4.0)
+	want := a*25 + (1-a)*100
+	if math.Abs(out1-want) > 1e-6 {
+		t.Fatalf("após a troca, a referência deve continuar de 25 (Seed), got %v want %v", out1, want)
+	}
+	if math.Abs(out1) < 1e-6 {
+		t.Fatalf("referência não deveria saltar para 0 após a troca de filtro, got %v", out1)
+	}
+}
+
+func TestSetParamsFiltroTipoInvalidoRetornaErroEMantemFiltroAntigo(t *testing.T) {
+	cfg := config.Config{PID: config.PID{Kp: 1, Max: 100, Min: -100, IClamp: 100,
+		Setpoint: 100, SetpointFilterType: "moving_average", SetpointFilterSize: 4}}
+	c := pid.New(cfg)
+	base := time.Now()
+	if _, err := c.Compute(0, base.Add(1*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+
+	bogus := "bogus"
+	if err := c.SetParams(entities.ControllerParams{SetpointFilterType: &bogus}); err == nil {
+		t.Fatal("esperava erro para tipo de filtro inválido")
+	}
+
+	out, err := c.Compute(0, base.Add(2*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if math.Abs(out-50) > 1e-6 {
+		t.Fatalf("filtro antigo (moving_average) deveria continuar funcionando, got %v", out)
 	}
 }

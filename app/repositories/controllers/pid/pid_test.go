@@ -179,3 +179,27 @@ func TestNewPanicsNegativeIClamp(t *testing.T) {
 	}()
 	pid.New(cfg(1.0, 0, 0, 0, 100, -1, 15.0))
 }
+
+func TestSetpointFilterMovingAverageRampaReferencia(t *testing.T) {
+	cfg := config.Config{PID: config.PID{Kp: 1, Max: 100, Min: -100, IClamp: 100,
+		Setpoint: 50, SetpointFilterType: "moving_average", SetpointFilterSize: 4}}
+	c := pid.New(cfg)
+	base := time.Now()
+	out1, _ := c.Compute(0, base.Add(1*time.Second))
+	if math.Abs(out1-12.5) > 1e-6 {
+		t.Fatalf("1º tique: referência deve ser 12,5 (P=12,5), got %v", out1)
+	}
+}
+
+func TestLegacyTauViraExponencialEquivalente(t *testing.T) {
+	cfg := config.Config{MetricsPoller: config.MetricsPoller{IntervalMs: 5000},
+		PID: config.PID{Kp: 1, Max: 100, Min: -100, IClamp: 100, Setpoint: 50,
+			SetpointFilterTau: 10}}
+	c := pid.New(cfg)
+	base := time.Now()
+	out1, _ := c.Compute(0, base.Add(5*time.Second))
+	want := (1 - math.Exp(-0.5)) * 50
+	if math.Abs(out1-want) > 1e-6 {
+		t.Fatalf("tau=2T deve equivaler a size=2: got %v want %v", out1, want)
+	}
+}

@@ -33,6 +33,9 @@ type ControllerParams struct {
 	// FilterSize is the moving-average window on the measurement (all controllers).
 	FilterSize *int
 
+	SetpointFilterType *string
+	SetpointFilterSize *int
+
 	// FfGain is the plant static gain K used for feedforward: u_ff = setpoint/K.
 	// Zero disables feedforward. (PID controller.)
 	FfGain *float64

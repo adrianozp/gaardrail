@@ -27,15 +27,13 @@ type Controller struct {
 	// integral does not have to ramp up to it (removes setpoint overshoot).
 	Kff float64
 
-	setpoint    float64
-	i           float64
-	prevE       float64
-	first       bool
-	lastCompute time.Time
-	filter      *filter.MovingAverage
-	// Setpoint filter: 1st-order prefilter on the reference (pure setpoint signal).
-	spFilterTau float64
-	spFiltered  float64
+	setpoint     float64
+	i            float64
+	prevE        float64
+	first        bool
+	lastCompute  time.Time
+	refFilter    *filter.Signal
+	refEffective float64
 }
 
 type ControllerParams struct {
@@ -57,18 +55,38 @@ func New(cfg config.Config) *Controller {
 		panic("pid.New: iClamp must be >= 0")
 	}
 	return &Controller{
-		Kp:       cfg.PID.Kp,
-		Ki:       cfg.PID.Ki,
-		Kd:       cfg.PID.Kd,
-		Min:      cfg.PID.Min,
-		Max:      cfg.PID.Max,
-		IClamp:      cfg.PID.IClamp,
-		Kff:         cfg.PID.FfGain,
-		first:       true,
-		setpoint:    cfg.PID.Setpoint,
-		filter:      filter.NewMovingAverage(cfg.PID.FilterSize),
-		spFilterTau: cfg.PID.SetpointFilterTau,
+		Kp:        cfg.PID.Kp,
+		Ki:        cfg.PID.Ki,
+		Kd:        cfg.PID.Kd,
+		Min:       cfg.PID.Min,
+		Max:       cfg.PID.Max,
+		IClamp:    cfg.PID.IClamp,
+		Kff:       cfg.PID.FfGain,
+		first:     true,
+		setpoint:  cfg.PID.Setpoint,
+		refFilter: referenceFilterFromConfig(cfg),
 	}
+}
+
+func referenceFilterFromConfig(cfg config.Config) *filter.Signal {
+	p := cfg.PID
+	kind, size := p.SetpointFilterType, p.SetpointFilterSize
+	if kind == "" && p.SetpointFilterTau > 0 {
+		kind = "exponential"
+		size = equivalentSamples(p.SetpointFilterTau, cfg.MetricsPoller.IntervalMs)
+	}
+	f, err := filter.NewReferenceFilter(kind, size)
+	if err != nil {
+		panic("pid.New: " + err.Error())
+	}
+	return f
+}
+
+func equivalentSamples(tauSeconds float64, intervalMs int) int {
+	if intervalMs <= 0 {
+		return 1
+	}
+	return max(int(math.Round(tauSeconds*1000/float64(intervalMs))), 1)
 }
 
 // Compute runs one PID tick.
@@ -90,19 +108,8 @@ func (c *Controller) Compute(measured float64, measureTime time.Time) (float64, 
 		return 0, err
 	}
 
-	// Smooth the (noisy) measurement before the control law.
-	measured = c.filter.Filter(measured)
-
-	// Setpoint filter: a referência efetiva persegue o setpoint por um 1º ordem,
-	// evitando o degrau que satura o atuador. É PURO no sinal de setpoint — não
-	// olha a medição (rampa do valor anterior, 0 no boot, até o setpoint). Não
-	// afeta a rejeição de perturbação (só molda a referência).
-	spEff := c.setpoint
-	if c.spFilterTau > 0 {
-		a := math.Exp(-dt / c.spFilterTau)
-		c.spFiltered = a*c.spFiltered + (1-a)*c.setpoint
-		spEff = c.spFiltered
-	}
+	spEff := c.refFilter.Filter(c.setpoint)
+	c.refEffective = spEff
 
 	e := spEff - measured
 
@@ -165,19 +172,20 @@ func (c *Controller) GetParams() entities.ControllerParams {
 
 	kp, ki, kd := c.Kp, c.Ki, c.Kd
 	min, max, iclamp, setpoint := c.Min, c.Max, c.IClamp, c.setpoint
-	fsize := c.filter.Size()
+	spFilterType, spFilterSize := c.refFilter.Kind(), c.refFilter.Size()
 	kff := c.Kff
 
 	return entities.ControllerParams{
-		Kp:         &kp,
-		Ki:         &ki,
-		Kd:         &kd,
-		Min:        &min,
-		Max:        &max,
-		IClamp:     &iclamp,
-		Setpoint:   &setpoint,
-		FilterSize: &fsize,
-		FfGain:     &kff,
+		Kp:                 &kp,
+		Ki:                 &ki,
+		Kd:                 &kd,
+		Min:                &min,
+		Max:                &max,
+		IClamp:             &iclamp,
+		Setpoint:           &setpoint,
+		SetpointFilterType: &spFilterType,
+		SetpointFilterSize: &spFilterSize,
+		FfGain:             &kff,
 	}
 }
 
@@ -210,6 +218,22 @@ func (c *Controller) SetParams(p entities.ControllerParams) error {
 	}
 	if p.FfGain != nil {
 		c.Kff = *p.FfGain
+	}
+
+	if p.SetpointFilterType != nil || p.SetpointFilterSize != nil {
+		kind, size := c.refFilter.Kind(), c.refFilter.Size()
+		if p.SetpointFilterType != nil {
+			kind = *p.SetpointFilterType
+		}
+		if p.SetpointFilterSize != nil {
+			size = *p.SetpointFilterSize
+		}
+		f, err := filter.NewReferenceFilter(kind, size)
+		if err != nil {
+			return err
+		}
+		f.Seed(c.refEffective)
+		c.refFilter = f
 	}
 
 	if c.Min > c.Max {
@@ -249,8 +273,8 @@ func (c *Controller) Reset() {
 	c.prevE = 0
 	c.first = true
 	c.lastCompute = time.Time{}
-	c.filter.Reset()
-	c.spFiltered = 0
+	c.refFilter.Reset()
+	c.refEffective = 0
 }
 
 func (c *Controller) Type() string { return "pid" }

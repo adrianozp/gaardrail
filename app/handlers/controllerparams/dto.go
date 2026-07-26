@@ -12,6 +12,9 @@ type updatePIDParamsRequest struct {
 	Setpoint *float64 `json:"setpoint"`
 	FfGain   *float64 `json:"ff_gain"`
 
+	SetpointFilterType *string `json:"setpoint_filter_type"`
+	SetpointFilterSize *int    `json:"setpoint_filter_size"`
+
 	// Smith predictor internal FOPDT model (ignored by other controllers).
 	ModelK        *float64 `json:"model_k"`
 	ModelTau      *float64 `json:"model_tau"`
@@ -21,32 +24,36 @@ type updatePIDParamsRequest struct {
 
 func (r updatePIDParamsRequest) toPIDParams() entities.ControllerParams {
 	return entities.ControllerParams{
-		Kp:            r.Kp,
-		Ki:            r.Ki,
-		Kd:            r.Kd,
-		Min:           r.Min,
-		Max:           r.Max,
-		IClamp:        r.IClamp,
-		Setpoint:      r.Setpoint,
-		FfGain:        r.FfGain,
-		ModelK:        r.ModelK,
-		ModelTau:      r.ModelTau,
-		ModelTheta:    r.ModelTheta,
-		SampleSeconds: r.SampleSeconds,
+		Kp:                 r.Kp,
+		Ki:                 r.Ki,
+		Kd:                 r.Kd,
+		Min:                r.Min,
+		Max:                r.Max,
+		IClamp:             r.IClamp,
+		Setpoint:           r.Setpoint,
+		FfGain:             r.FfGain,
+		SetpointFilterType: r.SetpointFilterType,
+		SetpointFilterSize: r.SetpointFilterSize,
+		ModelK:             r.ModelK,
+		ModelTau:           r.ModelTau,
+		ModelTheta:         r.ModelTheta,
+		SampleSeconds:      r.SampleSeconds,
 	}
 }
 
 type pidParamsResponse struct {
-	Type       string  `json:"type"`
-	Kp         float64 `json:"kp"`
-	Ki         float64 `json:"ki"`
-	Kd         float64 `json:"kd"`
-	Min        float64 `json:"min"`
-	Max        float64 `json:"max"`
-	IClamp     float64 `json:"i_clamp"`
-	Setpoint   float64 `json:"setpoint"`
-	FilterSize int     `json:"filter_size"`
-	FfGain     float64 `json:"ff_gain"`
+	Type     string  `json:"type"`
+	Kp       float64 `json:"kp"`
+	Ki       float64 `json:"ki"`
+	Kd       float64 `json:"kd"`
+	Min      float64 `json:"min"`
+	Max      float64 `json:"max"`
+	IClamp   float64 `json:"i_clamp"`
+	Setpoint float64 `json:"setpoint"`
+	FfGain   float64 `json:"ff_gain"`
+
+	SetpointFilterType string `json:"setpoint_filter_type"`
+	SetpointFilterSize int    `json:"setpoint_filter_size"`
 
 	// Smith predictor internal FOPDT model (omitted for other controllers).
 	ModelK        *float64 `json:"model_k,omitempty"`
@@ -78,11 +85,14 @@ func pidParamsFromEntity(p entities.ControllerParams) pidParamsResponse {
 	if p.Setpoint != nil {
 		r.Setpoint = *p.Setpoint
 	}
-	if p.FilterSize != nil {
-		r.FilterSize = *p.FilterSize
-	}
 	if p.FfGain != nil {
 		r.FfGain = *p.FfGain
+	}
+	if p.SetpointFilterType != nil {
+		r.SetpointFilterType = *p.SetpointFilterType
+	}
+	if p.SetpointFilterSize != nil {
+		r.SetpointFilterSize = *p.SetpointFilterSize
 	}
 	r.ModelK = p.ModelK
 	r.ModelTau = p.ModelTau

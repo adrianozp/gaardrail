@@ -298,11 +298,12 @@
   </div>
 
   <script>
-    const FIELDS = ['setpoint', 'kp', 'ki', 'kd', 'min', 'max', 'i_clamp', 'ff_gain'];
+    const FIELDS = ['setpoint', 'kp', 'ki', 'kd', 'min', 'max', 'i_clamp', 'ff_gain', 'setpoint_filter_size'];
     // Smith is a PI (no derivative) + internal model; the model fields below are
     // read-only (set via config from the identification, shown for insight).
-    const SMITH_FIELDS = ['setpoint', 'kp', 'ki', 'min', 'max', 'i_clamp'];
-    const SMITH_MODEL = ['model_k', 'model_tau', 'model_theta', 'sample_seconds', 'filter_size'];
+    const SMITH_FIELDS = ['setpoint', 'kp', 'ki', 'min', 'max', 'i_clamp', 'setpoint_filter_size'];
+    const SMITH_MODEL = ['model_k', 'model_tau', 'model_theta', 'sample_seconds'];
+    const SETPOINT_FILTER_TYPES = ['none', 'moving_average', 'exponential'];
     let current = {};            // controller params from /pid
     let queue = { type: 'inmemory', available: [] };
     let drawerOpen = false;
@@ -348,7 +349,19 @@
     }
 
     function renderParams() {
-      let html =
+      let html = '';
+      if (current.type !== 'step') {
+        const filterType = current.setpoint_filter_type !== undefined ? current.setpoint_filter_type : 'none';
+        html += `<div class="params-grid">
+          <div class="pfield">
+            <label>setpoint_filter_type</label>
+            <select id="input-setpoint_filter_type">` + SETPOINT_FILTER_TYPES.map(t => `
+              <option value="${t}"${t === filterType ? ' selected' : ''}>${t}</option>
+            `).join('') + `</select>
+          </div>
+        </div>`;
+      }
+      html +=
         `<div class="params-grid">` + activeFields().map(f => `
           <div class="pfield">
             <label>${f}</label>
@@ -385,6 +398,8 @@
         if (isNaN(val)) continue;
         if (val !== current[f]) body[f] = val;
       }
+      const t = document.getElementById('input-setpoint_filter_type');
+      if (t && t.value !== current.setpoint_filter_type) body.setpoint_filter_type = t.value;
       if (Object.keys(body).length === 0) return;
 
       try {

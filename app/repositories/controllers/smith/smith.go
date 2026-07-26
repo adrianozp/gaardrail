@@ -45,15 +45,16 @@ type Controller struct {
 	modelK, modelTau, modelTheta float64
 	sampleSeconds                float64
 
-	setpoint    float64
-	i           float64 // integral accumulator
-	yModel      float64 // delay-free model output (state of the first-order model)
-	prevU       float64 // last control output applied to the model
-	delay       []float64
-	delayHead   int
-	first       bool
-	lastCompute time.Time
-	filter      *filter.MovingAverage
+	setpoint     float64
+	i            float64 // integral accumulator
+	yModel       float64 // delay-free model output (state of the first-order model)
+	prevU        float64 // last control output applied to the model
+	delay        []float64
+	delayHead    int
+	first        bool
+	lastCompute  time.Time
+	refFilter    *filter.Signal
+	refEffective float64
 }
 
 // New builds a Smith predictor from config. Panics on invalid static config
@@ -89,10 +90,18 @@ func New(cfg config.Config) *Controller {
 		sampleSeconds: sampleSeconds,
 		setpoint:      s.Setpoint,
 		first:         true,
-		filter:        filter.NewMovingAverage(s.FilterSize),
+		refFilter:     referenceFilterFromConfig(s),
 	}
 	c.resizeDelay()
 	return c
+}
+
+func referenceFilterFromConfig(s config.Smith) *filter.Signal {
+	f, err := filter.NewReferenceFilter(s.SetpointFilterType, s.SetpointFilterSize)
+	if err != nil {
+		panic("smith.New: " + err.Error())
+	}
+	return f
 }
 
 // resizeDelay (re)allocates the dead-time ring buffer from the current model
@@ -119,8 +128,8 @@ func (c *Controller) Compute(measured float64, measureTime time.Time) (float64, 
 		return 0, err
 	}
 
-	// Smooth the (noisy) measurement before it enters the predictor feedback.
-	measured = c.filter.Filter(measured)
+	spEff := c.refFilter.Filter(c.setpoint)
+	c.refEffective = spEff
 
 	// Advance the delay-free first-order model with the previous control output
 	// held over dt (ZOH): yModel <- a*yModel + K*(1-a)*prevU, a = e^{-dt/tau}.
@@ -137,7 +146,7 @@ func (c *Controller) Compute(measured float64, measureTime time.Time) (float64, 
 
 	// Smith predictor feedback: measured + (delay-free model - delayed model).
 	feedback := measured + (c.yModel - delayed)
-	e := c.setpoint - feedback
+	e := spEff - feedback
 
 	p := c.Kp * e
 
@@ -159,7 +168,7 @@ func (c *Controller) Compute(measured float64, measureTime time.Time) (float64, 
 	c.lastCompute = measureTime
 
 	metrics.Gauge(map[string]float64{
-		"smith_setpoint":   c.setpoint,
+		"smith_setpoint":   spEff,
 		"smith_error":      e,
 		"smith_feedback":   feedback,
 		"smith_prediction": c.yModel,
@@ -184,20 +193,21 @@ func (c *Controller) GetParams() entities.ControllerParams {
 	kp, ki := c.Kp, c.Ki
 	min, max, iclamp, setpoint := c.Min, c.Max, c.IClamp, c.setpoint
 	mk, mtau, mtheta, ss := c.modelK, c.modelTau, c.modelTheta, c.sampleSeconds
-	fsize := c.filter.Size()
+	spFilterType, spFilterSize := c.refFilter.Kind(), c.refFilter.Size()
 
 	return entities.ControllerParams{
-		Kp:            &kp,
-		Ki:            &ki,
-		Min:           &min,
-		Max:           &max,
-		IClamp:        &iclamp,
-		Setpoint:      &setpoint,
-		FilterSize:    &fsize,
-		ModelK:        &mk,
-		ModelTau:      &mtau,
-		ModelTheta:    &mtheta,
-		SampleSeconds: &ss,
+		Kp:                 &kp,
+		Ki:                 &ki,
+		Min:                &min,
+		Max:                &max,
+		IClamp:             &iclamp,
+		Setpoint:           &setpoint,
+		SetpointFilterType: &spFilterType,
+		SetpointFilterSize: &spFilterSize,
+		ModelK:             &mk,
+		ModelTau:           &mtau,
+		ModelTheta:         &mtheta,
+		SampleSeconds:      &ss,
 	}
 }
 
@@ -224,6 +234,22 @@ func (c *Controller) SetParams(p entities.ControllerParams) error {
 	}
 	if p.Setpoint != nil {
 		c.setpoint = *p.Setpoint
+	}
+
+	if p.SetpointFilterType != nil || p.SetpointFilterSize != nil {
+		kind, size := c.refFilter.Kind(), c.refFilter.Size()
+		if p.SetpointFilterType != nil {
+			kind = *p.SetpointFilterType
+		}
+		if p.SetpointFilterSize != nil {
+			size = *p.SetpointFilterSize
+		}
+		f, err := filter.NewReferenceFilter(kind, size)
+		if err != nil {
+			return err
+		}
+		f.Seed(c.refEffective)
+		c.refFilter = f
 	}
 
 	// Internal FOPDT model (from identification): allows runtime re-tuning of the
@@ -299,7 +325,8 @@ func (c *Controller) Reset() {
 	c.prevU = 0
 	c.first = true
 	c.lastCompute = time.Time{}
-	c.filter.Reset()
+	c.refFilter.Reset()
+	c.refEffective = 0
 	c.resizeDelay()
 }
 

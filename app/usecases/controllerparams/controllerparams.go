@@ -35,7 +35,14 @@ func (u UseCase) Update(p entities.ControllerParams) error {
 		return err
 	}
 
-	if updates := pidUpdates(p); len(updates) > 0 {
+	updates := pidUpdates(p)
+	if p.SetpointFilterType != nil || p.SetpointFilterSize != nil {
+		for k, v := range effectiveFilterUpdates(u.controller.GetParams()) {
+			updates[k] = v
+		}
+	}
+
+	if len(updates) > 0 {
 		if err := u.store.Set(updates); err != nil {
 			log.Warn().Err(err).Msg("controllerparams: persist failed")
 		}
@@ -75,6 +82,17 @@ func pidUpdates(p entities.ControllerParams) map[string]any {
 	}
 	if p.IClamp != nil {
 		updates["pid.i_clamp"] = *p.IClamp
+	}
+	return updates
+}
+
+func effectiveFilterUpdates(effective entities.ControllerParams) map[string]any {
+	updates := map[string]any{}
+	if effective.SetpointFilterType != nil {
+		updates["pid.setpoint_filter_type"] = *effective.SetpointFilterType
+	}
+	if effective.SetpointFilterSize != nil {
+		updates["pid.setpoint_filter_size"] = *effective.SetpointFilterSize
 	}
 	return updates
 }

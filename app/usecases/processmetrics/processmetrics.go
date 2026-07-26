@@ -5,7 +5,9 @@ import (
 	"time"
 
 	"github.com/adrianozp/gaardrail/app/entities"
+	"github.com/adrianozp/gaardrail/internal/filter"
 	metrics "github.com/adrianozp/gaardrail/internal/metrics"
+	"github.com/adrianozp/gaardrail/pkg/config"
 	"github.com/rs/zerolog/log"
 )
 
@@ -21,12 +23,18 @@ type Orchestrator interface {
 type ProcessMetricsUseCase struct {
 	controller   Controller
 	orchestrator Orchestrator
+	pvFilter     *filter.Signal
 }
 
-func NewProcessMetricsUseCase(c Controller, o Orchestrator) ProcessMetricsUseCase {
+func NewProcessMetricsUseCase(c Controller, o Orchestrator, cfg config.Config) ProcessMetricsUseCase {
+	pvFilter, err := filter.NewMeasurementFilter(cfg.MetricsPoller.FilterType, cfg.MetricsPoller.FilterSize)
+	if err != nil {
+		panic("processmetrics.NewProcessMetricsUseCase: " + err.Error())
+	}
 	return ProcessMetricsUseCase{
 		controller:   c,
 		orchestrator: o,
+		pvFilter:     pvFilter,
 	}
 }
 
@@ -37,9 +45,8 @@ func (u ProcessMetricsUseCase) Process(m entities.Metrics) error {
 		return errors.New("cpu metric not found")
 	}
 
-	// measured_cpu is the controller-agnostic process variable fed to the
-	// controller. Emitted here (not in the controller) so the dashboard shows
-	// it regardless of which controller is active.
+	cpuPercentage = u.pvFilter.Filter(cpuPercentage)
+
 	metrics.Gauge(map[string]float64{"measured_cpu": cpuPercentage})
 
 	drainRate, err := u.controller.Compute(cpuPercentage, m.MeasureTime)

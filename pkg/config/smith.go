@@ -21,15 +21,14 @@ type Smith struct {
 	// buffer (delay in samples = round(ModelTheta / SampleSeconds)).
 	SampleSeconds float64 `mapstructure:"sample_seconds" default:"1.0"`
 
-	// FilterSize is the moving-average window applied to the measurement
-	// (<=1 disables filtering).
-	FilterSize int `mapstructure:"filter_size" default:"1"`
+	SetpointFilterType string `mapstructure:"setpoint_filter_type" default:""`
+	SetpointFilterSize int    `mapstructure:"setpoint_filter_size" default:"0"`
 }
 
 func init() {
 	envKeys = append(envKeys,
 		"smith.kp", "smith.ki", "smith.min", "smith.max", "smith.i_clamp", "smith.setpoint",
 		"smith.model_k", "smith.model_tau", "smith.model_theta", "smith.sample_seconds",
-		"smith.filter_size",
+		"smith.setpoint_filter_type", "smith.setpoint_filter_size",
 	)
 }

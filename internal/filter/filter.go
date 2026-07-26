@@ -56,8 +56,6 @@ func (m *MovingAverage) Reset() {
 	}
 }
 
-// FilterFullWindow pushes x into the window and returns the average over
-// exactly size samples, used for reference filters that must start from zero state.
 func (m *MovingAverage) FilterFullWindow(x float64) float64 {
 	if m.size <= 1 {
 		return x
@@ -73,7 +71,6 @@ func (m *MovingAverage) FilterFullWindow(x float64) float64 {
 	return m.sum / float64(m.size)
 }
 
-// fill populates the entire buffer with a single value, used for seeding.
 func (m *MovingAverage) fill(v float64) {
 	m.n = m.size
 	m.sum = v * float64(m.size)
@@ -149,6 +146,6 @@ func (s *Signal) Seed(v float64) {
 	s.ma.fill(v)
 }
 
-func (s *Signal) Reset() { s.state = 0; s.seeded = false; s.ma.Reset() }
+func (s *Signal) Reset()       { s.state = 0; s.seeded = false; s.ma.Reset() }
 func (s *Signal) Kind() string { return s.kind }
 func (s *Signal) Size() int    { return s.size }

@@ -30,9 +30,6 @@ type ControllerParams struct {
 	IClamp   *float64
 	Setpoint *float64
 
-	// FilterSize is the moving-average window on the measurement (all controllers).
-	FilterSize *int
-
 	SetpointFilterType *string
 	SetpointFilterSize *int
 

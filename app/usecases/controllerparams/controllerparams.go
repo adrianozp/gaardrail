@@ -76,5 +76,11 @@ func pidUpdates(p entities.ControllerParams) map[string]any {
 	if p.IClamp != nil {
 		updates["pid.i_clamp"] = *p.IClamp
 	}
+	if p.SetpointFilterType != nil {
+		updates["pid.setpoint_filter_type"] = *p.SetpointFilterType
+	}
+	if p.SetpointFilterSize != nil {
+		updates["pid.setpoint_filter_size"] = *p.SetpointFilterSize
+	}
 	return updates
 }

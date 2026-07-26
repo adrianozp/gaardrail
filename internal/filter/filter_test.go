@@ -61,3 +61,50 @@ func TestSmoothsNoise(t *testing.T) {
 		t.Errorf("expected filtered value near 50, got %v", last)
 	}
 }
+
+func TestSignalNonePassthrough(t *testing.T) {
+	s, err := NewReferenceFilter("none", 5)
+	if err != nil || s.Filter(50) != 50 {
+		t.Fatalf("none deve ser passthrough, err=%v", err)
+	}
+}
+
+func TestSignalMovingAverageRampaDegrauEmNAmostras(t *testing.T) {
+	s, _ := NewReferenceFilter("moving_average", 4)
+	got := []float64{s.Filter(50), s.Filter(50), s.Filter(50), s.Filter(50)}
+	want := []float64{12.5, 25, 37.5, 50}
+	for i := range want {
+		if math.Abs(got[i]-want[i]) > 1e-9 {
+			t.Fatalf("amostra %d: got %v want %v", i, got[i], want[i])
+		}
+	}
+}
+
+func TestSignalExponentialConstantePorTique(t *testing.T) {
+	s, _ := NewReferenceFilter("exponential", 2)
+	a := math.Exp(-0.5)
+	if got, want := s.Filter(50), (1-a)*50; math.Abs(got-want) > 1e-9 {
+		t.Fatalf("got %v want %v", got, want)
+	}
+}
+
+func TestSignalMeasurementSeedsComPrimeiraAmostra(t *testing.T) {
+	s, _ := NewMeasurementFilter("exponential", 4)
+	if got := s.Filter(80); got != 80 {
+		t.Fatalf("1ª amostra deve passar direto, got %v", got)
+	}
+}
+
+func TestSignalKindInvalido(t *testing.T) {
+	if _, err := NewReferenceFilter("mediana", 3); err == nil {
+		t.Fatal("kind inválido deve dar erro")
+	}
+}
+
+func TestSignalSeedDefineEstado(t *testing.T) {
+	s, _ := NewReferenceFilter("exponential", 3)
+	s.Seed(50)
+	if got := s.Filter(50); math.Abs(got-50) > 1e-9 {
+		t.Fatalf("após Seed(50), Filter(50) deve manter 50, got %v", got)
+	}
+}

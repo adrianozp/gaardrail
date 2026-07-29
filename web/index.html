@@ -266,6 +266,22 @@
     </div>
 
     <div class="section divided">
+      <div class="label">Filtro de setpoint</div>
+      <div class="field">
+        <label>tipo</label>
+        <select id="sf-type"></select>
+      </div>
+      <div class="field">
+        <label>tamanho (amostras)</label>
+        <input type="number" id="sf-size" min="1" step="1" value="1">
+      </div>
+      <div class="row">
+        <button class="btn-save" id="sf-apply" onclick="applyFilter()">✓ aplicar</button>
+      </div>
+      <span id="sf-msg" class="msg"></span>
+    </div>
+
+    <div class="section divided">
       <div class="label">Fila</div>
       <select id="qtype" onchange="switchQueue(this.value)"></select>
       <div id="queue-config"></div>
@@ -298,10 +314,10 @@
   </div>
 
   <script>
-    const FIELDS = ['setpoint', 'kp', 'ki', 'kd', 'min', 'max', 'i_clamp', 'ff_gain', 'setpoint_filter_size'];
+    const FIELDS = ['setpoint', 'kp', 'ki', 'kd', 'min', 'max', 'i_clamp', 'ff_gain'];
     // Smith is a PI (no derivative) + internal model; the model fields below are
     // read-only (set via config from the identification, shown for insight).
-    const SMITH_FIELDS = ['setpoint', 'kp', 'ki', 'min', 'max', 'i_clamp', 'setpoint_filter_size'];
+    const SMITH_FIELDS = ['setpoint', 'kp', 'ki', 'min', 'max', 'i_clamp'];
     const SMITH_MODEL = ['model_k', 'model_tau', 'model_theta', 'sample_seconds'];
     const SETPOINT_FILTER_TYPES = ['none', 'moving_average', 'exponential'];
     let current = {};            // controller params from /pid
@@ -338,6 +354,7 @@
         current = await res.json();
         if (current.type) document.getElementById('ctype').value = current.type;
         renderParams();
+        renderFilter();
         renderSummary();
         document.getElementById('ctrl-active').innerHTML =
           `<span class="k">controlador ativo</span> <span class="type">${current.type || '—'}</span>`;
@@ -349,19 +366,7 @@
     }
 
     function renderParams() {
-      let html = '';
-      if (current.type !== 'step') {
-        const filterType = current.setpoint_filter_type !== undefined ? current.setpoint_filter_type : 'none';
-        html += `<div class="params-grid">
-          <div class="pfield">
-            <label>setpoint_filter_type</label>
-            <select id="input-setpoint_filter_type">` + SETPOINT_FILTER_TYPES.map(t => `
-              <option value="${t}"${t === filterType ? ' selected' : ''}>${t}</option>
-            `).join('') + `</select>
-          </div>
-        </div>`;
-      }
-      html +=
+      let html =
         `<div class="params-grid">` + activeFields().map(f => `
           <div class="pfield">
             <label>${f}</label>
@@ -387,8 +392,15 @@
       const parts = activeFields()
         .map(f => `<span class="k">${f}</span> <span class="v">${current[f] !== undefined ? current[f] : '—'}</span>`)
         .join(' <span class="k">·</span> ');
+      let filterPart = '';
+      if (current.type !== 'step' && current.setpoint_filter_type !== undefined) {
+        const val = current.setpoint_filter_type === 'none'
+          ? 'none'
+          : `${current.setpoint_filter_type}·${current.setpoint_filter_size}`;
+        filterPart = ` <span class="k">·</span> <span class="k">filtro</span> <span class="v">${val}</span>`;
+      }
       document.getElementById('summary').innerHTML =
-        `<span class="type">${current.type || '—'}</span> <span class="k">·</span> ` + parts;
+        `<span class="type">${current.type || '—'}</span> <span class="k">·</span> ` + parts + filterPart;
     }
 
     async function saveParams() {
@@ -398,8 +410,6 @@
         if (isNaN(val)) continue;
         if (val !== current[f]) body[f] = val;
       }
-      const t = document.getElementById('input-setpoint_filter_type');
-      if (t && t.value !== current.setpoint_filter_type) body.setpoint_filter_type = t.value;
       if (Object.keys(body).length === 0) return;
 
       try {
@@ -453,6 +463,59 @@
       d.className = '';
       if (drawerOpen) d.classList.add('open');
       if (cls) d.classList.add(cls);
+    }
+
+    // ---- Setpoint filter ----
+
+    function renderFilter() {
+      const sel = document.getElementById('sf-type');
+      const size = document.getElementById('sf-size');
+      const filterType = current.setpoint_filter_type !== undefined ? current.setpoint_filter_type : 'none';
+      sel.innerHTML = SETPOINT_FILTER_TYPES
+        .map(t => `<option value="${t}"${t === filterType ? ' selected' : ''}>${t}</option>`)
+        .join('');
+      if (current.setpoint_filter_size !== undefined) size.value = current.setpoint_filter_size;
+      // O step é um atuador fixo, sem referência: o filtro não se aplica.
+      const off = current.type === 'step';
+      sel.disabled = off;
+      size.disabled = off;
+      document.getElementById('sf-apply').disabled = off;
+    }
+
+    async function applyFilter() {
+      const type = document.getElementById('sf-type').value;
+      const size = parseInt(document.getElementById('sf-size').value, 10);
+      if (isNaN(size) || size < 1) { sfMsg('tamanho: inteiro ≥ 1', '#da3633'); return; }
+
+      const body = {};
+      if (type !== current.setpoint_filter_type) body.setpoint_filter_type = type;
+      if (size !== current.setpoint_filter_size) body.setpoint_filter_size = size;
+      if (Object.keys(body).length === 0) return;
+
+      try {
+        const res = await fetch('/pid', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          sfMsg(data.error || `Erro ${res.status}`, '#da3633');
+          return;
+        }
+        sfMsg('✓ aplicado', '#238636');
+        setTimeout(loadParams, 1500);
+      } catch (_) {
+        sfMsg('Erro de rede', '#da3633');
+      }
+    }
+
+    function sfMsg(msg, color) {
+      const el = document.getElementById('sf-msg');
+      if (!el) return;
+      el.textContent = msg;
+      el.style.color = color;
+      if (msg) setTimeout(() => { el.textContent = ''; }, 3000);
     }
 
     // ---- Queue ----
@@ -680,6 +743,7 @@
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') closeDrawer();
       if (e.key === 'Enter' && drawerOpen && e.target.id && e.target.id.startsWith('input-')) saveParams();
+      if (e.key === 'Enter' && drawerOpen && e.target.id === 'sf-size') applyFilter();
     });
 
     function renderPoll() {

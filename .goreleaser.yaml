@@ -1,0 +1,44 @@
+version: 2
+
+project_name: gaardrail
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - main: ./cmd/api
+    binary: gaardrail
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w
+
+archives:
+  - formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - LICENSE
+      - README.md
+
+dockers:
+  - goos: linux
+    goarch: amd64
+    image_templates:
+      - "adrianozdp/gaardrail:{{ .Tag }}"
+      - "adrianozdp/gaardrail:latest"
+    dockerfile: Dockerfile.goreleaser
+    build_flag_templates:
+      - "--platform=linux/amd64"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs"
+      - "^ci"
+      - "^test"

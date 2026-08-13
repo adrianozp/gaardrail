@@ -33,3 +33,5 @@ go.work.sum
 
 # Superpowers brainstorm sessions
 .superpowers/
+
+dist/

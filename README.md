@@ -1,5 +1,9 @@
 # gaardrail
 
+[![CI](https://github.com/adrianozp/gaardrail/actions/workflows/ci.yml/badge.svg)](https://github.com/adrianozp/gaardrail/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/adrianozp/gaardrail)](https://github.com/adrianozp/gaardrail/releases)
+[![License: MPL-2.0](https://img.shields.io/badge/License-MPL--2.0-brightgreen.svg)](LICENSE)
+
 **gaardrail** is a back-pressure controller for message queue consumers. It uses a discrete PID controller to regulate how fast messages are drained from a queue, targeting a configurable resource utilization setpoint (e.g. database CPU at 50%).
 
 ## How it works
@@ -33,7 +37,38 @@
                                     └─────────────────────────────┘
 ```
 
----
+## Quickstart
+
+gaardrail sits between a queue and a target, so you need:
+
+- a **SQL target** it will push messages into (MySQL supported today);
+- a **metrics source** exposing the resource you want to protect (any Prometheus-compatible query API);
+- optionally a **Kafka** queue — the default config uses `queue.protocol: constant`, a synthetic queue that always emits the same query, so you can watch the control loop work without any broker.
+
+Run the published image, mounting your config:
+
+```bash
+docker run -d -p 8080:8080 \
+  -v $(pwd)/config.yaml:/app/config/config.yaml \
+  adrianozdp/gaardrail:latest
+```
+
+Or from source:
+
+```bash
+git clone https://github.com/adrianozp/gaardrail
+cd gaardrail
+make run        # go run ./cmd/api — reads config/config.yaml
+```
+
+To use a real Kafka queue locally:
+
+```bash
+make kafka/up && make kafka/setup   # single-node Kafka via docker compose
+# then set queue.protocol: kafka in config.yaml
+```
+
+The built-in web panel is served at [http://localhost:8080](http://localhost:8080) — live tuning of every controller parameter, controller type switching and disturbance controls.
 
 ## Orchestrator
 
@@ -44,15 +79,6 @@ On each tick, each worker:
 2. Calls `Consumer.Consume()` — dequeues, pushes to the target, and acks
 
 The drain rate starts at the value defined in config and is updated in real time by the PID controller. A background poller also tracks the current queue lag (`Consumer.Size()`) and publishes it as a metric.
-
-```go
-type Consumer interface {
-    Consume() (string, error)
-    Size()    (int64, error)
-}
-```
-
----
 
 ## PID Controller
 
@@ -68,48 +94,21 @@ output(t) = clamp(P + I + D,  Min,  Max)
 
 The output is the new **drain rate** in messages/second, clamped to `[Min, Max]`.
 
-Two configurable filters shape the loop's signals. The **measurement filter** lives on the metrics chain (`metrics_poller.filter_type` / `filter_size`) and smooths the process variable before it reaches whichever controller is active — since identification reads the same filtered gauge, the filter is absorbed into the identified model. The **setpoint filter** is per controller (`setpoint_filter_type` / `setpoint_filter_size`) and turns setpoint changes into a gradual trajectory, removing startup overshoot.
+Two configurable filters shape the loop's signals. The **measurement filter** lives on the metrics chain (`metrics_poller.filter_type` / `filter_size`) and smooths the process variable before it reaches whichever controller is active. The **setpoint filter** is per controller (`setpoint_filter_type` / `setpoint_filter_size`) and turns setpoint changes into a gradual trajectory, removing startup overshoot.
 
 Both accept the types `none`, `moving_average` and `exponential`, with sizes in samples: a moving-average setpoint filter turns a step into a linear ramp that completes in exactly N samples; the exponential type is a first-order lag with a time constant of N samples (`a = e^(−1/N)`). The legacy `setpoint_filter_tau` (seconds) is still honored and maps to the equivalent exponential.
 
-| Parameter | Role |
-|-----------|------|
-| `Kp` | Proportional gain — immediate response to error |
-| `Ki` | Integral gain — eliminates steady-state error over time |
-| `Kd` | Derivative gain — dampens oscillations by reacting to error rate of change |
-| `IClamp` | Anti-windup bound on the integral accumulator |
-| `setpoint` | Target resource utilization (e.g. `50.0` for 50% CPU) |
-| `Min / Max` | Output clamp — drain rate bounds in msgs/s |
-| `setpoint_filter_type` | Setpoint filter: `none`, `moving_average` or `exponential` |
-| `setpoint_filter_size` | Setpoint filter size, in samples |
-
-Parameters can be read and updated at runtime without restarting:
-
-```bash
-# read current parameters
-curl http://localhost:8080/pid
-
-# update one or more parameters (only present fields are changed)
-curl -X PATCH http://localhost:8080/pid \
-  -H "Content-Type: application/json" \
-  -d '{"kp": 0.15, "setpoint": 55.0}'
-```
-
-Changing any parameter resets the integral accumulator to prevent windup artifacts from the previous gains.
-
 ### Controller types
 
-The active controller is selected by `controller.type` and can be switched at runtime with `PUT /controller/type` (body `{"type": "..."}`):
+The active controller is selected by `controller.type` and can be switched at runtime with `PUT /controller/type`:
 
 | Type | Description |
 |------|-------------|
-| `pid` | Discrete PI (feedforward off) — the production baseline. |
+| `pid` | Discrete PI (feedforward off) — the baseline. |
 | `pidff` | Same PI with feedforward (`u_ff = setpoint/ff_gain`). |
 | `smith` | Smith predictor (PI + internal FOPDT model) for dead-time compensation. |
 | `step` | Open-loop constant output (`max`), used for identification experiments. |
-| `autopid` | **Self-tuning**: on activation runs an open-loop step, identifies a FOPDT model (two-point Smith method), computes the gains automatically (AMIGO or SIMC, `autopid.tuning_rule`) and closes the loop with an embedded PID. Removes the manual offline tuning step. |
-
----
+| `autopid` | **Self-tuning**: runs an open-loop step, identifies a FOPDT model (two-point Smith method), computes the gains automatically (AMIGO or SIMC) and closes the loop. |
 
 ## Message consumption
 
@@ -119,19 +118,11 @@ Each `Consume()` call follows a strict sequence:
 Dequeue  →  Push(target)  →  Ack
 ```
 
-- **Dequeue**: pulls one message from the queue
-- **Push**: forwards it to the configured target (e.g. a SQL database)
-- **Ack**: commits the offset back to the queue
-
 A message is only acked after the target confirms receipt. If either `Push` or `Ack` fails, the message is not acked and will be redelivered.
-
----
 
 ## Interfaces
 
-gaardrail is built around two pairs of interfaces, keeping transport and storage details outside the core logic.
-
-**Queue** — message source
+gaardrail keeps transport and storage details outside the core logic:
 
 ```go
 type Queue interface {
@@ -139,155 +130,78 @@ type Queue interface {
     Ack(entities.Message) error
     Size() (int64, error)
 }
-```
 
-**Target** — message sink
-
-```go
 type Target interface {
     Push(entities.Message) error
 }
-```
 
-**MetricsReader** — process variable source for the PID controller
-
-```go
 type MetricsReader interface {
     Read(ctx context.Context) (entities.Metrics, error)
 }
 ```
 
-Current implementations: Kafka (queue), MySQL (target), Prometheus HTTP API (metrics reader).
-
----
+Current implementations: Kafka and constant (queue), MySQL (target), Prometheus HTTP API (metrics reader).
 
 ## Configuration
 
-`config.yaml` (all fields also settable via `APP_*` environment variables):
+`config/config.yaml` is the fully annotated reference; fields can be overridden with `APP_*` environment variables. The core sections:
 
 ```yaml
-pid:
-  setpoint: 50.0   # target CPU %
-  kp: 0.1
-  ki: 0.1
-  kd: 0.05
-  min: 0.0         # minimum drain rate (msgs/s)
-  max: 10.0        # maximum drain rate (msgs/s)
-  i_clamp: 5.0     # integral anti-windup bound
-  setpoint_filter_type: exponential   # none | moving_average | exponential
-  setpoint_filter_size: 2             # in samples
-
-orchestrator:
-  workers: 1       # parallel consumer goroutines
-  burst: 5         # token bucket burst size
-
+queue:
+  protocol: constant          # constant | kafka
+target:
+  protocol: sql
+  driver: mysql
+  dsn: "root:root@tcp(localhost:3306)/gaardrail"
 metrics_poller:
-  enabled: true
-  interval_ms: 1000
+  interval_ms: 5000           # control period T
   protocol: prometheusapi
   endpoint: "http://localhost:9090/api/v1/query"
-  filter_type: none    # measurement filter: none | moving_average | exponential
-  filter_size: 1       # in samples
   mappings:
-    'irate(container_cpu_usage_seconds_total{...}[1m])*100': cpu
+    '<promql query>': cpu     # maps a query to the process variable
+controller:
+  type: "pidff"               # pid | pidff | smith | step | autopid
+pid:
+  setpoint: 50                # target resource utilization (%)
+  kp: 0.058
+  ki: 0.009
+  min: 0                      # drain rate bounds (msgs/s)
+  max: 50
+  i_clamp: 40                 # anti-windup bound
 ```
 
----
+`smith` and `autopid` have their own sections (internal FOPDT model and identification/tuning settings) — see the comments in [config/config.yaml](config/config.yaml).
 
-## Running locally
+## HTTP API
 
-```bash
-# start infrastructure (MySQL, Prometheus, Grafana)
-make infra/up
-make kafka/up
-make kafka/setup
-
-# run the application
-make run
-```
-
----
-
-## Flood test
-
-The flood test exercises the full control loop under load. It requires the infrastructure from the previous section to be running.
-
-### 1. Start the flood stack
-
-The flood stack extends the base infra with cAdvisor and a dedicated Grafana dashboard:
-
-```bash
-docker compose -f flood-test/docker-compose-flood.yml up -d
-```
-
-Open Grafana at [http://localhost:3000](http://localhost:3000) — the **Flood Test** dashboard is provisioned automatically.
-
-### 2. Set up the database
-
-Creates the `flood_data` table and seeds it with 1 million rows across 5 indexes, providing enough data volume to generate meaningful CPU pressure:
-
-```bash
-./flood-test/scripts/setup-db.sh
-```
-
-### 3. Send messages to the queue
-
-Each message payload is a heavy SQL query (full scans, self-joins, correlated subqueries). The orchestrator will pull them from Kafka and execute them against MySQL.
-
-```bash
-# send 2000 messages (default)
-./flood-test/scripts/flood.sh
-
-# send a custom amount
-./flood-test/scripts/flood.sh 5000
-```
-
-### 4. (Optional) Add an external disturbance
-
-To observe the controller reacting to a sudden CPU spike independent of the message queue, run parallel `BENCHMARK` queries directly on MySQL:
-
-```bash
-# 3 workers for 60 seconds (defaults)
-./flood-test/scripts/disturb.sh
-
-# custom: 5 workers, lighter iterations, 30 seconds
-./flood-test/scripts/disturb.sh 2 5000 30
-
-# run indefinitely until Ctrl+C
-./flood-test/scripts/disturb.sh 2 5000 0
-```
-
-### 5. Tune the controller live
-
-PID parameters can be adjusted at any time without restarting the application. Changes take effect on the next poll tick and are visible in the **PID Params History** panel.
-
-All fields are optional — only the ones present in the body are updated. Changing any parameter resets the integral accumulator to prevent windup artifacts from previous gains.
+| Endpoint | Description |
+|----------|-------------|
+| `GET /ping` | Health check |
+| `GET /metrics` | Prometheus metrics (drain rate, queue lag, PID terms…) |
+| `POST /messages` | Enqueue a message |
+| `GET /pid` | Read active controller parameters |
+| `PATCH /pid` | Update parameters at runtime (only present fields change) |
+| `PUT /controller/type` | Switch the active controller |
 
 ```bash
 curl -X PATCH http://localhost:8080/pid \
   -H "Content-Type: application/json" \
-  -d '{
-    "setpoint": 50.0,
-    "kp": 0.15,
-    "ki": 0.05,
-    "kd": 0.02,
-    "min": 0.0,
-    "max": 10.0,
-    "i_clamp": 5.0,
-    "setpoint_filter_type": "moving_average",
-    "setpoint_filter_size": 4
-  }'
+  -d '{"kp": 0.15, "setpoint": 55.0}'
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `setpoint` | float | Target CPU % |
-| `kp` | float | Proportional gain |
-| `ki` | float | Integral gain |
-| `kd` | float | Derivative gain |
-| `min` | float | Minimum drain rate (msgs/s) |
-| `max` | float | Maximum drain rate (msgs/s) |
-| `i_clamp` | float | Anti-windup bound on the integral accumulator |
-| `setpoint_filter_type` | string | Setpoint filter: `none`, `moving_average` or `exponential` |
-| `setpoint_filter_size` | int | Setpoint filter size, in samples (`>= 1`) |
+Changing any parameter resets the integral accumulator to prevent windup artifacts. Full schema in [openapi.yaml](openapi.yaml).
+
+## Validation
+
+gaardrail's control loop was validated experimentally — system identification (FOPDT), closed-loop campaigns at T=10s and T=60s, disturbance rejection, and a PI / PI+feedforward / Smith predictor comparison. The full rig (Docker Compose stack, Grafana dashboards, experiment data and analysis scripts) lives at [gaardrail-flood-test](https://github.com/adrianozp/gaardrail-flood-test).
+
+The project started as a final thesis (PFC) in Control and Automation Engineering at UFSC (Brazil).
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Security reports: [SECURITY.md](SECURITY.md).
+
+## License
+
+[MPL-2.0](LICENSE)
 

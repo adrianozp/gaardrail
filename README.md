@@ -68,7 +68,7 @@ make kafka/up && make kafka/setup   # single-node Kafka via docker compose
 # then set queue.protocol: kafka in config.yaml
 ```
 
-The built-in web panel is served at [http://localhost:8080](http://localhost:8080) — live tuning of every controller parameter, controller type switching and disturbance controls.
+gaardrail is headless — an example web panel (live tuning, controller switching, embedded Grafana) lives in the [gaardrail-flood-test](https://github.com/adrianozp/gaardrail-flood-test) repo under `panel/`, alongside disturbance-generation scripts for experiments.
 
 ## Orchestrator
 

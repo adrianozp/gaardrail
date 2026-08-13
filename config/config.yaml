@@ -35,8 +35,6 @@ orchestrator:
   rate: 0
   workers: 1
   burst: 5
-grafana:
-  url: "http://localhost:3000/d/flood-test/flood-test?kiosk"
 pid: # PIFF baseline at T=10s (PI documented in the regime-10s campaign, truncated at 3 decimals)
   setpoint: 50
   kp: 0.058

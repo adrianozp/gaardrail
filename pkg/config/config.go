@@ -23,7 +23,6 @@ type Config struct {
 	Smith         Smith         `mapstructure:"smith"`
 	AutoPID       AutoPID       `mapstructure:"autopid"`
 	Orchestrator  Orchestrator  `mapstructure:"orchestrator"`
-	Grafana       Grafana       `mapstructure:"grafana"`
 
 	// Path is the resolved config file used at load time, set after reading. It
 	// is the target for runtime persistence and is not bound to any yaml key.

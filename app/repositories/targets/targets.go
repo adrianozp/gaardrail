@@ -31,8 +31,8 @@ func NewTarget(cfg config.Config, client *sqlclient.Client) (Pusher, error) {
 	}
 }
 
-// NewSQLClient builds the SQL client shared by the SQL target and the
-// disturbance component. It returns nil when the target is not SQL.
+// NewSQLClient builds the SQL client used by the SQL target.
+// It returns nil when the target is not SQL.
 func NewSQLClient(cfg config.Config) (*sqlclient.Client, error) {
 	if cfg.Target.Protocol != "sql" {
 		return nil, nil

@@ -31,11 +31,6 @@ func Options() fx.Option {
 		modules.OrchestratorFactories(),
 		modules.OrchestratorInjections(),
 
-		modules.DisturbanceFactories(),
-		modules.DisturbanceInjections(),
-		modules.DisturbanceEndpoints(),
-		modules.DisturbanceLifecycle(),
-
 		modules.MetricsPollerFactories(),
 		modules.MetricsPollerInjections(),
 		modules.MetricsPollerLifecycle(),

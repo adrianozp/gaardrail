@@ -35,7 +35,7 @@ func TestSetRunsQueryAtRate(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	time.Sleep(100 * time.Millisecond)
-	d.Set("", 0, 0)
+	_ = d.Set("", 0, 0)
 
 	if exec.count() == 0 {
 		t.Fatal("expected the query to have run at least once")
@@ -49,9 +49,9 @@ func TestSetRateZeroStops(t *testing.T) {
 	exec := &fakeExecutor{}
 	d := New(exec)
 
-	d.Set("SELECT 1", 200, 0)
+	_ = d.Set("SELECT 1", 200, 0)
 	time.Sleep(30 * time.Millisecond)
-	d.Set("", 0, 0)
+	_ = d.Set("", 0, 0)
 
 	settled := exec.count()
 	time.Sleep(50 * time.Millisecond)
@@ -67,7 +67,7 @@ func TestTimedPulseAutoStops(t *testing.T) {
 	exec := &fakeExecutor{}
 	d := New(exec)
 
-	d.Set("SELECT 1", 200, 40*time.Millisecond)
+	_ = d.Set("SELECT 1", 200, 40*time.Millisecond)
 	time.Sleep(120 * time.Millisecond)
 
 	if d.Get().Rate != 0 {

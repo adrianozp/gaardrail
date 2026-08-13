@@ -60,7 +60,7 @@ func TestMinimumClamp(t *testing.T) {
 func TestIntegralAntiWindup(t *testing.T) {
 	c := smith.New(cfg(0, 1.0, 0, 100, 20, 15.0, 1, 1, 0, 1))
 	for i := 0; i < 20; i++ {
-		c.Compute(10.0, t0.Add(time.Duration(i+1)*5*time.Second)) // error=5, dt=5
+		_, _ = c.Compute(10.0, t0.Add(time.Duration(i+1)*5*time.Second)) // error=5, dt=5
 	}
 	out, err := c.Compute(15.0, t0.Add(21*5*time.Second)) // error=0 → output = I
 	if err != nil {
@@ -108,8 +108,8 @@ func TestDeadTimeCompensation(t *testing.T) {
 
 func TestReset(t *testing.T) {
 	c := smith.New(cfg(1.0, 1.0, 0, 100, 20, 15.0, 2, 10, 10, 10))
-	c.Compute(5.0, t0.Add(10*time.Second))
-	c.Compute(5.0, t0.Add(20*time.Second))
+	_, _ = c.Compute(5.0, t0.Add(10*time.Second))
+	_, _ = c.Compute(5.0, t0.Add(20*time.Second))
 	c.Reset()
 	out1, err := c.Compute(5.0, t0.Add(10*time.Second))
 	if err != nil {
@@ -170,7 +170,7 @@ func TestSetParamsRejectsInvalidModel(t *testing.T) {
 
 func TestSetParamsResetsIntegral(t *testing.T) {
 	c := smith.New(cfg(0, 1.0, 0, 100, 20, 15.0, 1, 1, 0, 1))
-	c.Compute(10.0, t0.Add(5*time.Second)) // build up some integral
+	_, _ = c.Compute(10.0, t0.Add(5*time.Second)) // build up some integral
 	kp := 2.0
 	if err := c.SetParams(entityKp(kp)); err != nil {
 		t.Fatal(err)
@@ -215,7 +215,7 @@ func TestComputeNaNMeasured(t *testing.T) {
 
 func TestComputeOutdatedTime(t *testing.T) {
 	c := smith.New(cfg(1.0, 0, 0, 100, 20, 15.0, 1, 1, 0, 1))
-	c.Compute(5.0, t0.Add(10*time.Second))
+	_, _ = c.Compute(5.0, t0.Add(10*time.Second))
 	if _, err := c.Compute(5.0, t0.Add(5*time.Second)); err == nil {
 		t.Error("expected error for outdated measureTime, got nil")
 	}

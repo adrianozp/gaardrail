@@ -58,7 +58,7 @@ func TestIntegralAntiWindup(t *testing.T) {
 	c := pid.New(cfg(0, 1.0, 0, 0, 100, 20, 15.0))
 	for i := 0; i < 20; i++ {
 		// error=5, dt=5 each tick; unclamped I would be 500
-		c.Compute(10.0, t0.Add(time.Duration(i+1)*5*time.Second))
+		_, _ = c.Compute(10.0, t0.Add(time.Duration(i+1)*5*time.Second))
 	}
 	// I should be clamped at 20, so output = I = 20
 	out, err := c.Compute(15.0, t0.Add(21*5*time.Second)) // error=0, P=0, D=0 → output=I
@@ -73,7 +73,7 @@ func TestIntegralAntiWindup(t *testing.T) {
 func TestDerivative(t *testing.T) {
 	// Kd=1, dt=5: error goes from 10 to 5 → D = Kd*(5-10)/5 = -1
 	c := pid.New(cfg(0, 0, 1.0, -100, 100, 20, 15.0))
-	c.Compute(5.0, t0.Add(5*time.Second))               // first tick: error=10, D=0 (no prev)
+	_, _ = c.Compute(5.0, t0.Add(5*time.Second))        // first tick: error=10, D=0 (no prev)
 	out, err := c.Compute(10.0, t0.Add(10*time.Second)) // second tick: error=5, D=(5-10)/5*Kd=-1
 	if err != nil {
 		t.Fatal(err)
@@ -109,7 +109,7 @@ func TestFeedforwardDisabledWhenZero(t *testing.T) {
 
 func TestReset(t *testing.T) {
 	c := pid.New(cfg(1.0, 1.0, 1.0, 0, 100, 20, 15.0))
-	c.Compute(5.0, t0.Add(5*time.Second))
+	_, _ = c.Compute(5.0, t0.Add(5*time.Second))
 	c.Reset()
 	out1, err := c.Compute(5.0, t0.Add(5*time.Second))
 	if err != nil {
@@ -156,7 +156,7 @@ func TestComputeNaNMeasured(t *testing.T) {
 
 func TestComputeOutdatedTime(t *testing.T) {
 	c := pid.New(cfg(1.0, 0, 0, 0, 100, 20, 15.0))
-	c.Compute(5.0, t0.Add(10*time.Second))
+	_, _ = c.Compute(5.0, t0.Add(10*time.Second))
 	_, err := c.Compute(5.0, t0.Add(5*time.Second)) // earlier than last compute
 	if err == nil {
 		t.Error("expected error for outdated measureTime, got nil")

@@ -52,10 +52,3 @@ func NewSQLClient(cfg config.Config) (*sqlclient.Client, error) {
 	}
 	return client, nil
 }
-
-// noopTarget is used when MetricsPoller.Enabled is false.
-type noopTarget struct{}
-
-func (n *noopTarget) Push(_ context.Context, _ entities.Message) error {
-	return nil
-}

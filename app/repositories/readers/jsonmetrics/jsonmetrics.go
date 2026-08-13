@@ -35,7 +35,7 @@ func (r *JSONMetricsReader) Read(ctx context.Context) (entities.Metrics, error) 
 	if err != nil {
 		return entities.Metrics{}, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return entities.Metrics{}, fmt.Errorf("jsonmetrics: unexpected status %d", resp.StatusCode)

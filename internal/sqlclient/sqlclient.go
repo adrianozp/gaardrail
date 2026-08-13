@@ -60,7 +60,7 @@ func New(cfg Config) (*Client, error) {
 	db.SetConnMaxIdleTime(2 * time.Minute)
 
 	if err := db.Ping(); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("sqlclient: ping: %w", err)
 	}
 	return &Client{db: db}, nil

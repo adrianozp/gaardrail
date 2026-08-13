@@ -41,13 +41,13 @@ func (r *Reader) Read(ctx context.Context) (entities.Metrics, error) {
 	if err != nil {
 		return entities.Metrics{}, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return entities.Metrics{}, fmt.Errorf("exporter: unexpected status %d", resp.StatusCode)
 	}
 
-	parser := expfmt.NewTextParser(model.NameValidationScheme)
+	parser := expfmt.NewTextParser(model.UTF8Validation)
 	mfs, err := parser.TextToMetricFamilies(resp.Body)
 	if err != nil && len(mfs) == 0 {
 		return entities.Metrics{}, fmt.Errorf("exporter: parse error: %w", err)

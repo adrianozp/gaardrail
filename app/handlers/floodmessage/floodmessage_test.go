@@ -43,7 +43,7 @@ func TestHandle_ValidRequest_Returns202WithQueuedCount(t *testing.T) {
 
 	assert.Equal(t, http.StatusAccepted, w.Code)
 	var resp map[string]int
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 	assert.Equal(t, 3, resp["queued"])
 
 	for i := 0; i < 3; i++ {
@@ -71,7 +71,7 @@ func TestHandle_DefaultQuantityIsOne(t *testing.T) {
 
 	assert.Equal(t, http.StatusAccepted, w.Code)
 	var resp map[string]int
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 	assert.Equal(t, 1, resp["queued"])
 
 	select {
@@ -93,7 +93,7 @@ func TestHandle_QuantityExceedsMax_Returns400(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	var resp map[string]string
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 	assert.Equal(t, "quantity exceeds max (10000)", resp["error"])
 }
 
@@ -109,7 +109,7 @@ func TestHandle_QuantityBelowOne_Returns400(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	var resp map[string]string
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 	assert.Equal(t, "quantity must be at least 1", resp["error"])
 }
 

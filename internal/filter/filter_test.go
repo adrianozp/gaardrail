@@ -49,7 +49,7 @@ func TestSmoothsNoise(t *testing.T) {
 	m := NewMovingAverage(10)
 	var last float64
 	for i := 0; i < 100; i++ {
-		x := 50.0
+		var x float64
 		if i%2 == 0 {
 			x = 0
 		} else {

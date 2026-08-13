@@ -27,33 +27,33 @@ func New(cfg config.Config) (*Client, error) {
 	}
 
 	if err := ensureTopic(client, cfg.Kafka.Topic, cfg.Kafka.Partition+1); err != nil {
-		client.Close()
+		_ = client.Close()
 		return nil, err
 	}
 
 	if err := client.RefreshMetadata(cfg.Kafka.Topic); err != nil {
-		client.Close()
+		_ = client.Close()
 		return nil, err
 	}
 
 	consumer, err := sarama.NewConsumerFromClient(client)
 	if err != nil {
-		client.Close()
+		_ = client.Close()
 		return nil, err
 	}
 
 	manager, err := sarama.NewOffsetManagerFromClient(cfg.Kafka.GroupID, client)
 	if err != nil {
-		consumer.Close()
-		client.Close()
+		_ = consumer.Close()
+		_ = client.Close()
 		return nil, err
 	}
 
 	pom, err := manager.ManagePartition(cfg.Kafka.Topic, cfg.Kafka.Partition)
 	if err != nil {
-		manager.Close()
-		consumer.Close()
-		client.Close()
+		_ = manager.Close()
+		_ = consumer.Close()
+		_ = client.Close()
 		return nil, err
 	}
 
@@ -64,20 +64,20 @@ func New(cfg config.Config) (*Client, error) {
 
 	pc, err := consumer.ConsumePartition(cfg.Kafka.Topic, cfg.Kafka.Partition, nextOffset)
 	if err != nil {
-		pom.Close()
-		manager.Close()
-		consumer.Close()
-		client.Close()
+		_ = pom.Close()
+		_ = manager.Close()
+		_ = consumer.Close()
+		_ = client.Close()
 		return nil, err
 	}
 
 	producer, err := sarama.NewSyncProducerFromClient(client)
 	if err != nil {
-		pc.Close()
-		pom.Close()
-		manager.Close()
-		consumer.Close()
-		client.Close()
+		_ = pc.Close()
+		_ = pom.Close()
+		_ = manager.Close()
+		_ = consumer.Close()
+		_ = client.Close()
 		return nil, err
 	}
 
@@ -101,7 +101,7 @@ func ensureTopic(client sarama.Client, topic string, numPartitions int32) error 
 	if err != nil {
 		return err
 	}
-	defer admin.Close()
+	defer func() { _ = admin.Close() }()
 
 	topics, err := admin.ListTopics()
 	if err != nil {
@@ -153,9 +153,9 @@ func (c *Client) Publish(key string, body []byte) error {
 }
 
 func (c *Client) Close() error {
-	c.producer.Close()
-	c.pom.Close()
-	c.manager.Close()
-	c.consumer.Close()
+	_ = c.producer.Close()
+	_ = c.pom.Close()
+	_ = c.manager.Close()
+	_ = c.consumer.Close()
 	return c.client.Close()
 }

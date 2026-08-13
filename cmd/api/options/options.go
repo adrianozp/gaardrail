@@ -9,6 +9,7 @@ import (
 	"github.com/adrianozp/gaardrail/pkg/config"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/rs/zerolog/log"
 	"go.uber.org/fx"
 )
 
@@ -52,9 +53,17 @@ func Options() fx.Option {
 			lc.Append(fx.Hook{
 				OnStart: func(ctx context.Context) error {
 					if cfg.HTTP.TLSEnabled() {
-						go router.RunTLS(cfg.HTTP.Addr, cfg.HTTP.CertFile, cfg.HTTP.KeyFile)
+						go func() {
+							if err := router.RunTLS(cfg.HTTP.Addr, cfg.HTTP.CertFile, cfg.HTTP.KeyFile); err != nil {
+								log.Error().Err(err).Msg("options: http server (tls) stopped")
+							}
+						}()
 					} else {
-						go router.Run(cfg.HTTP.Addr)
+						go func() {
+							if err := router.Run(cfg.HTTP.Addr); err != nil {
+								log.Error().Err(err).Msg("options: http server stopped")
+							}
+						}()
 					}
 					return nil
 				},

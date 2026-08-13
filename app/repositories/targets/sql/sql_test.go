@@ -15,7 +15,7 @@ import (
 func TestSQLRepository_Push_ExecutesQueryFromBody(t *testing.T) {
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	query := "INSERT INTO events (id) VALUES ('abc')"
 	mock.ExpectExec(query).WillReturnResult(sqlmock.NewResult(1, 1))
@@ -31,7 +31,7 @@ func TestSQLRepository_Push_ExecutesQueryFromBody(t *testing.T) {
 func TestSQLRepository_Push_ReturnsErrorOnQueryFailure(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectExec(".*").WillReturnError(fmt.Errorf("db error"))
 

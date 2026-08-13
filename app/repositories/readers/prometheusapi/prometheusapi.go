@@ -65,7 +65,7 @@ func (r *Reader) queryValue(ctx context.Context, expr string) (float64, time.Tim
 	if err != nil {
 		return 0, time.Time{}, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return 0, time.Time{}, fmt.Errorf("unexpected status %d", resp.StatusCode)

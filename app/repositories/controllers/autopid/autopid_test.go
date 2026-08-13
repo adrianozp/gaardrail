@@ -172,8 +172,8 @@ func TestOutOfOrderAndNaN(t *testing.T) {
 func TestResetReidentifies(t *testing.T) {
 	c := autopid.New(testCfg())
 	// Advance into the step phase.
-	c.Compute(50, t0.Add(0*time.Second))
-	c.Compute(50, t0.Add(70*time.Second))
+	_, _ = c.Compute(50, t0.Add(0*time.Second))
+	_, _ = c.Compute(50, t0.Add(70*time.Second))
 
 	c.Reset()
 

@@ -1,4 +1,4 @@
-FROM golang:latest AS builder
+FROM golang:1.25 AS builder
 
 WORKDIR /build
 
@@ -9,7 +9,7 @@ COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux go build -o gaardrail ./cmd/api
 
-FROM alpine:latest
+FROM alpine:3.22
 
 RUN apk add --no-cache ca-certificates tzdata
 

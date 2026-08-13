@@ -19,4 +19,4 @@ COPY --from=builder /build/gaardrail .
 
 EXPOSE 8080
 
-CMD ["./gaardrail"]
+ENTRYPOINT ["./gaardrail"]

@@ -126,13 +126,14 @@ gaardrail keeps transport and storage details outside the core logic:
 
 ```go
 type Queue interface {
-    Dequeue() (entities.Message, error)
-    Ack(entities.Message) error
+    Enqueue(entities.Message) (string, error)
+    Dequeue(context.Context) (entities.Message, error)
+    Ack(context.Context, entities.Message) error
     Size() (int64, error)
 }
 
 type Target interface {
-    Push(entities.Message) error
+    Push(context.Context, entities.Message) (entities.Response, error)
 }
 
 type MetricsReader interface {
@@ -140,7 +141,7 @@ type MetricsReader interface {
 }
 ```
 
-Current implementations: Kafka and constant (queue), MySQL (target), Prometheus HTTP API (metrics reader).
+Current implementations: Kafka and constant (queue), MySQL (target); Prometheus HTTP API, Prometheus exporter (text-format scrape), JSON metrics endpoint and AWS CloudWatch (metrics readers).
 
 ## Configuration
 
@@ -189,7 +190,7 @@ curl -X PATCH http://localhost:8080/pid \
   -d '{"kp": 0.15, "setpoint": 55.0}'
 ```
 
-Changing any parameter resets the integral accumulator to prevent windup artifacts. Full schema in [openapi.yaml](openapi.yaml).
+Changing any parameter resets the integral accumulator to prevent windup artifacts. The main endpoints are described in [openapi.yaml](openapi.yaml).
 
 ## Validation
 

@@ -22,7 +22,7 @@ func SetRecorder(r Recorder) { global = r }
 
 // Gauge sets one or more named gauge metrics on the global recorder.
 func Gauge(values map[string]float64) {
-	log.Info().Fields(map[string]any{"values": values}).Msg("metrics: gauge")
+	log.Debug().Fields(map[string]any{"values": values}).Msg("metrics: gauge")
 	global.Gauge(values)
 }
 

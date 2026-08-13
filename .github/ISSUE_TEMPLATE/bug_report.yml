@@ -1,0 +1,29 @@
+name: Bug report
+description: Report a problem with gaardrail
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect to happen instead?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: gaardrail version
+      placeholder: v0.1.0
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Relevant config
+      description: Relevant parts of your config.yaml (redact credentials).
+      render: yaml
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      render: shell

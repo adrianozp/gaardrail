@@ -2,16 +2,6 @@ version: "2"
 linters:
   exclusions:
     rules:
-      # req.toMetrics() self-invokes to derive MeasureTime because the DTO field
-      # is a string and entities.Metrics.MeasureTime is a time.Time; there is no
-      # existing time-parsing convention in this codebase to model the fix on,
-      # and the handler is not wired into any route yet, so fixing this requires
-      # a product/design decision (time format, parse-error handling) rather
-      # than a mechanical lint fix. See task-3-report.md for details.
-      - path: "app/handlers/receivemetrics/dto.go"
-        linters:
-          - staticcheck
-        text: "SA5007"
       # model.NameValidationScheme is a documented escape hatch for globally
       # toggling prometheus/common's metric-name validation scheme; it is
       # process-wide mutable state, so removing/changing the assignment here

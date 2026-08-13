@@ -21,10 +21,6 @@ type Target interface {
 	Push(context.Context, entities.Message) (entities.Response, error)
 }
 
-type ResponseQueue interface {
-	Enqueue(context.Context, entities.Response)
-}
-
 type ConsumeMessageUseCase struct {
 	sourceQueue SourceQueue
 	target      Target
@@ -42,7 +38,7 @@ func (u ConsumeMessageUseCase) Consume(ctx context.Context) (string, error) {
 	message, err := u.sourceQueue.Dequeue(ctx)
 	metrics.Gauge(map[string]float64{"dequeue_time_seconds": clock.Now().Sub(consumeStartTime).Seconds()})
 	if err != nil {
-		log.Error().Msg("error dequeing message")
+		log.Error().Msg("error dequeuing message")
 		return "", err
 	}
 
@@ -51,7 +47,6 @@ func (u ConsumeMessageUseCase) Consume(ctx context.Context) (string, error) {
 		log.Error().Str("message_id", message.ID).Msg("error pushing message")
 		return "", err
 	}
-	// u.responseQueue.Enqueue(ctx, response)
 
 	err = u.sourceQueue.Ack(ctx, message)
 	if err != nil {

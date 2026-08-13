@@ -29,8 +29,10 @@ func NewMovingAverage(size int) *MovingAverage {
 // Size returns the configured window length.
 func (m *MovingAverage) Size() int { return m.size }
 
-// Filter pushes x into the window and returns the average of the samples seen
-// so far (up to the window size). With size <= 1 it is a passthrough.
+// Filter pushes x into the window and returns the average over the full window
+// (sum/size), counting unfilled slots as zero. Callers that need a warm start
+// fill the window first (Signal seeds it with the first sample). With
+// size <= 1 it is a passthrough.
 func (m *MovingAverage) Filter(x float64) float64 {
 	if m.size <= 1 {
 		return x
@@ -43,7 +45,7 @@ func (m *MovingAverage) Filter(x float64) float64 {
 	m.buf[m.idx] = x
 	m.sum += x
 	m.idx = (m.idx + 1) % m.size
-	return m.sum / float64(m.n)
+	return m.sum / float64(m.size)
 }
 
 // Reset clears the window.
@@ -54,21 +56,6 @@ func (m *MovingAverage) Reset() {
 	for i := range m.buf {
 		m.buf[i] = 0
 	}
-}
-
-func (m *MovingAverage) FilterFullWindow(x float64) float64 {
-	if m.size <= 1 {
-		return x
-	}
-	if m.n == m.size {
-		m.sum -= m.buf[m.idx]
-	} else {
-		m.n++
-	}
-	m.buf[m.idx] = x
-	m.sum += x
-	m.idx = (m.idx + 1) % m.size
-	return m.sum / float64(m.size)
 }
 
 func (m *MovingAverage) fill(v float64) {
@@ -102,7 +89,7 @@ func newSignal(kind string, size int, seedFromFirst bool) (*Signal, error) {
 		kind = "none"
 	}
 	if kind != "none" && kind != "moving_average" && kind != "exponential" {
-		return nil, fmt.Errorf("filter: tipo desconhecido %q", kind)
+		return nil, fmt.Errorf("filter: unknown type %q", kind)
 	}
 	if size < 1 {
 		size = 1
@@ -126,7 +113,7 @@ func (s *Signal) filterMovingAverage(x float64) float64 {
 		s.Seed(x)
 		return x
 	}
-	return s.ma.FilterFullWindow(x)
+	return s.ma.Filter(x)
 }
 
 func (s *Signal) filterExponential(x float64) float64 {

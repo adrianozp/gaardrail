@@ -5,10 +5,11 @@
 //
 //	G(s) = K e^{-theta s} / (tau s + 1)
 //
-// by the two-point method of Smith (28.3%/63.2%, same as matlab/identify.m),
-// computes the PID gains automatically via the configured tuning rule (AMIGO or
-// SIMC) and then closes the loop with an embedded pid.Controller using those
-// gains. It therefore removes the manual offline tuning step.
+// by the two-point method of Smith (28.3%/63.2%), computes the PID gains
+// automatically via the configured tuning rule (AMIGO or SIMC) and then closes
+// the loop with an embedded pid.Controller using those gains. It therefore
+// removes the manual offline tuning step (the same procedure as identify.m in
+// the gaardrail-flood-test repo's matlab tooling).
 //
 // The controller advances through three phases, driven by the measurement clock:
 //
@@ -148,7 +149,7 @@ func (c *Controller) Compute(measured float64, measureTime time.Time) (float64, 
 		tRel := measureTime.Sub(c.stepStart).Seconds()
 		c.curve = append(c.curve, sample{T: tRel, Y: measured})
 		if tRel >= c.identifySeconds {
-			c.tune() // sets gains on the embedded PID and moves to CONTROL
+			c.tune()
 			c.mu.Unlock()
 			return c.pid.Compute(measured, measureTime)
 		}
@@ -180,7 +181,7 @@ func (c *Controller) tune() {
 	}
 
 	// Effective dead time seen by the discrete loop: identified theta plus one
-	// sampling period T (ZOH + sampling), consistent with identify.m.
+	// sampling period T (ZOH + sampling).
 	thetaEff := model.Theta + medianDt(c.curve)
 
 	g, err := computeGains(model, thetaEff, c.rule, c.mode, c.tauC)

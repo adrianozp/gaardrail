@@ -28,15 +28,15 @@ type sample struct {
 }
 
 // tailFraction is the portion of the reaction curve (by time) averaged to
-// estimate the steady-state value yinf, mirroring identify.m.
+// estimate the steady-state value yinf.
 const tailFraction = 0.1
 
-// identifyFOPDT estimates a FOPDT model from an open-loop step response using the
-// two-point method of Smith (28.3% / 63.2%), the same procedure as
-// matlab/identify.m. y0 is the pre-step baseline; curve is the reaction curve
-// (times relative to the step, ascending); du is the input step amplitude
-// (stepOutput - baselineOutput). Returns an error when the experiment is
-// degenerate (no input step, no measurable response, or non-positive tau).
+// identifyFOPDT estimates a FOPDT model from an open-loop step response using
+// the two-point method of Smith (28.3% / 63.2%). y0 is the pre-step baseline;
+// curve is the reaction curve (times relative to the step, ascending); du is
+// the input step amplitude (stepOutput - baselineOutput). Returns an error when
+// the experiment is degenerate (no input step, no measurable response, or
+// non-positive tau).
 func identifyFOPDT(y0 float64, curve []sample, du float64) (fopdt, error) {
 	if math.Abs(du) < 1e-9 {
 		return fopdt{}, errors.New("autopid: no input step (du ~= 0)")
@@ -45,22 +45,10 @@ func identifyFOPDT(y0 float64, curve []sample, du float64) (fopdt, error) {
 		return fopdt{}, errors.New("autopid: not enough samples to identify")
 	}
 
-	// yinf: mean of the final tail of the curve.
-	tEnd := curve[len(curve)-1].T
-	tStart := curve[0].T
-	tailStart := tEnd - tailFraction*(tEnd-tStart)
-	var sum float64
-	var n int
-	for _, s := range curve {
-		if s.T >= tailStart {
-			sum += s.Y
-			n++
-		}
-	}
-	if n == 0 {
+	yinf, ok := steadyState(curve)
+	if !ok {
 		return fopdt{}, errors.New("autopid: empty reaction tail")
 	}
-	yinf := sum / float64(n)
 
 	dy := yinf - y0
 	if math.Abs(dy) < 1e-9 {
@@ -84,10 +72,29 @@ func identifyFOPDT(y0 float64, curve []sample, du float64) (fopdt, error) {
 	return fopdt{K: k, Tau: tau, Theta: theta}, nil
 }
 
+// steadyState estimates the post-step steady-state value yinf as the mean of
+// the final tailFraction of the curve (by time). ok is false when the tail
+// holds no samples.
+func steadyState(curve []sample) (yinf float64, ok bool) {
+	tEnd := curve[len(curve)-1].T
+	tailStart := tEnd - tailFraction*(tEnd-curve[0].T)
+	var sum float64
+	var n int
+	for _, s := range curve {
+		if s.T >= tailStart {
+			sum += s.Y
+			n++
+		}
+	}
+	if n == 0 {
+		return 0, false
+	}
+	return sum / float64(n), true
+}
+
 // crossTime returns the first time the curve crosses level, with linear
 // interpolation between samples. dy sets the direction (rising if dy >= 0).
-// The second return is false if the level is never reached. Ported from the
-// crossTime helper in identify.m.
+// The second return is false if the level is never reached.
 func crossTime(curve []sample, level, dy float64) (float64, bool) {
 	rising := dy >= 0
 	for i, s := range curve {
@@ -131,9 +138,12 @@ func computeGains(m fopdt, thetaEff float64, rule, mode string, tauC float64) (g
 	}
 }
 
-// simcPI is the SIMC/Skogestad PI rule for a FOPDT plant, in position form.
-// Ported from simcPI in identify.m: Kc = (1/K)*tau/(tauc+theta),
-// tauI = min(tau, 4*(tauc+theta)). tauC <= 0 uses the robust default tauc=theta.
+// simcPI is the SIMC/Skogestad PI rule for a FOPDT plant, in position form:
+//
+//	Kc   = (1/K) * tau/(tauc+theta)
+//	TauI = min(tau, 4*(tauc+theta))
+//
+// tauC <= 0 uses the robust default tauc=theta.
 func simcPI(k, tau, theta, tauC float64) gains {
 	if tauC <= 0 {
 		tauC = theta

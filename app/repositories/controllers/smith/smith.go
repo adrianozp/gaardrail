@@ -51,7 +51,6 @@ type Controller struct {
 	prevU        float64 // last control output applied to the model
 	delay        []float64
 	delayHead    int
-	first        bool
 	lastCompute  time.Time
 	refFilter    *filter.Signal
 	refEffective float64
@@ -89,7 +88,6 @@ func New(cfg config.Config) *Controller {
 		modelTheta:    s.ModelTheta,
 		sampleSeconds: sampleSeconds,
 		setpoint:      s.Setpoint,
-		first:         true,
 		refFilter:     referenceFilterFromConfig(s),
 	}
 	c.resizeDelay()
@@ -131,40 +129,19 @@ func (c *Controller) Compute(measured float64, measureTime time.Time) (float64, 
 	spEff := c.refFilter.Filter(c.setpoint)
 	c.refEffective = spEff
 
-	// Advance the delay-free first-order model with the previous control output
-	// held over dt (ZOH): yModel <- a*yModel + K*(1-a)*prevU, a = e^{-dt/tau}.
-	a := math.Exp(-dt / c.modelTau)
-	c.yModel = a*c.yModel + c.modelK*(1-a)*c.prevU
-
-	// Delayed model output (theta seconds ago) via the ring buffer.
-	delayed := c.yModel
-	if len(c.delay) > 0 {
-		delayed = c.delay[c.delayHead]
-		c.delay[c.delayHead] = c.yModel
-		c.delayHead = (c.delayHead + 1) % len(c.delay)
-	}
+	yNow := c.advanceModel(dt)
+	yDelayed := c.pushDelay(yNow)
 
 	// Smith predictor feedback: measured + (delay-free model - delayed model).
-	feedback := measured + (c.yModel - delayed)
+	feedback := measured + (yNow - yDelayed)
 	e := spEff - feedback
 
 	p := c.Kp * e
-
-	// Integrate with conditional anti-windup (same scheme as the PID): bound the
-	// integral to the band that keeps the output off the rails, and to IClamp.
-	c.i += c.Ki * e * dt
-	lo := math.Max(-c.IClamp, c.Min-p)
-	hi := math.Min(c.IClamp, c.Max-p)
-	if lo <= hi {
-		c.i = clamp(c.i, lo, hi)
-	} else {
-		c.i = clamp(c.i, -c.IClamp, c.IClamp)
-	}
+	c.integrate(e, dt, p)
 
 	output := clamp(p+c.i, c.Min, c.Max)
 
 	c.prevU = output
-	c.first = false
 	c.lastCompute = measureTime
 
 	metrics.Gauge(map[string]float64{
@@ -182,6 +159,46 @@ func (c *Controller) Compute(measured float64, measureTime time.Time) (float64, 
 	})
 
 	return output, nil
+}
+
+// advanceModel advances the delay-free first-order model one tick, with the
+// previous control output held over dt (ZOH):
+//
+//	yModel <- a*yModel + K*(1-a)*prevU, a = e^{-dt/tau}
+//
+// Caller must hold the write lock.
+func (c *Controller) advanceModel(dt float64) float64 {
+	a := math.Exp(-dt / c.modelTau)
+	c.yModel = a*c.yModel + c.modelK*(1-a)*c.prevU
+	return c.yModel
+}
+
+// pushDelay pushes y into the dead-time ring buffer and returns the model
+// output from theta seconds (round(theta/T) samples) ago; with an empty buffer
+// (theta ~ 0) that is y itself. Caller must hold the write lock.
+func (c *Controller) pushDelay(y float64) float64 {
+	if len(c.delay) == 0 {
+		return y
+	}
+	delayed := c.delay[c.delayHead]
+	c.delay[c.delayHead] = y
+	c.delayHead = (c.delayHead + 1) % len(c.delay)
+	return delayed
+}
+
+// integrate advances the integral term with conditional anti-windup (same
+// scheme as the PID): the integral is bounded to the band that keeps the
+// (unclamped) output off the saturation rails, and always to [-IClamp, IClamp].
+// otherTerms is the sum of the non-integral output terms. Caller must hold the
+// write lock.
+func (c *Controller) integrate(e, dt, otherTerms float64) {
+	c.i += c.Ki * e * dt
+	lo := math.Max(-c.IClamp, c.Min-otherTerms)
+	hi := math.Min(c.IClamp, c.Max-otherTerms)
+	if lo > hi {
+		lo, hi = -c.IClamp, c.IClamp
+	}
+	c.i = clamp(c.i, lo, hi)
 }
 
 // GetParams returns a snapshot of the current PI parameters plus the internal
@@ -291,7 +308,6 @@ func (c *Controller) SetParams(p entities.ControllerParams) error {
 		c.resizeDelay()
 		c.yModel = 0
 		c.prevU = 0
-		c.first = true
 	}
 
 	c.i = 0
@@ -323,7 +339,6 @@ func (c *Controller) Reset() {
 	c.i = 0
 	c.yModel = 0
 	c.prevU = 0
-	c.first = true
 	c.lastCompute = time.Time{}
 	c.refFilter.Reset()
 	c.refEffective = 0

@@ -12,8 +12,8 @@ type PID struct {
 	// 0 disables feedforward.
 	FfGain float64 `mapstructure:"ff_gain" default:"0"`
 	// SetpointFilterTau is the time constant (s) of a 1st-order filter on the
-	// setpoint (soft-start / reference prefilter). 0 = instant setpoint (degrau).
-	// Reduz o sobressinal de partida sem afetar a rejeição de perturbação.
+	// setpoint (soft-start / reference prefilter). 0 = instant setpoint (step).
+	// Reduces startup overshoot without affecting disturbance rejection.
 	SetpointFilterTau  float64 `mapstructure:"setpoint_filter_tau" default:"0"`
 	SetpointFilterType string  `mapstructure:"setpoint_filter_type" default:""`
 	SetpointFilterSize int     `mapstructure:"setpoint_filter_size" default:"0"`

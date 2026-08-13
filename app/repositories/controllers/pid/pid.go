@@ -13,7 +13,7 @@ import (
 )
 
 // Controller is a discrete PID controller in position form.
-// output(t) = clamp(P + I(t) + D, Min, Max)
+// output(t) = clamp(FF + P + I(t) + D, Min, Max)
 // This is the absolute output (e.g. drain rate RPS), not a delta.
 type Controller struct {
 	mu         sync.RWMutex
@@ -34,16 +34,6 @@ type Controller struct {
 	lastCompute  time.Time
 	refFilter    *filter.Signal
 	refEffective float64
-}
-
-type ControllerParams struct {
-	Kp       float64
-	Ki       float64
-	Kd       float64
-	Min      float64
-	Max      float64
-	IClamp   float64
-	Setpoint float64
 }
 
 // New creates a Controller. iClamp prevents integral windup.
@@ -89,12 +79,9 @@ func equivalentSamples(tauSeconds float64, intervalMs int) int {
 	return max(int(math.Round(tauSeconds*1000/float64(intervalMs))), 1)
 }
 
-// Compute runs one PID tick.
-//   - dt: elapsed seconds since last tick
-//   - measured: current process variable (e.g. % CPU)
-//   - setpoint: desired target value
-//
-// Returns the new output clamped to [Min, Max].
+// Compute runs one PID tick for the measured process variable (e.g. % CPU) and
+// returns the new output clamped to [Min, Max]. measureTime derives the elapsed
+// dt; out-of-order samples are rejected.
 func (c *Controller) Compute(measured float64, measureTime time.Time) (float64, error) {
 	if math.IsNaN(measured) {
 		return 0, errors.New("invalid measured metric")
@@ -127,18 +114,7 @@ func (c *Controller) Compute(measured float64, measureTime time.Time) (float64, 
 		ff = spEff / c.Kff
 	}
 
-	// Integrate with conditional anti-windup: bound the integral to the band that
-	// keeps the (unclamped) output off the saturation rails, and also to IClamp.
-	// This stops windup during saturation (large setpoint steps, feedforward),
-	// which is what caused the overshoot with a plain integral clamp.
-	c.i += c.Ki * e * dt
-	lo := math.Max(-c.IClamp, c.Min-ff-p-d)
-	hi := math.Min(c.IClamp, c.Max-ff-p-d)
-	if lo <= hi {
-		c.i = clamp(c.i, lo, hi)
-	} else {
-		c.i = clamp(c.i, -c.IClamp, c.IClamp)
-	}
+	c.integrate(e, dt, ff+p+d)
 
 	c.first = false
 	c.prevE = e
@@ -163,6 +139,22 @@ func (c *Controller) Compute(measured float64, measureTime time.Time) (float64, 
 	})
 
 	return output, nil
+}
+
+// integrate advances the integral term with conditional anti-windup: the
+// integral is bounded to the band that keeps the (unclamped) output off the
+// saturation rails, and always to [-IClamp, IClamp]. This stops windup during
+// saturation (large setpoint steps, feedforward), which is what caused the
+// overshoot with a plain integral clamp. otherTerms is the sum of the
+// non-integral output terms. Caller must hold the write lock.
+func (c *Controller) integrate(e, dt, otherTerms float64) {
+	c.i += c.Ki * e * dt
+	lo := math.Max(-c.IClamp, c.Min-otherTerms)
+	hi := math.Min(c.IClamp, c.Max-otherTerms)
+	if lo > hi {
+		lo, hi = -c.IClamp, c.IClamp
+	}
+	c.i = clamp(c.i, lo, hi)
 }
 
 // GetParams returns a snapshot of the current PID parameters.
@@ -243,9 +235,7 @@ func (c *Controller) SetParams(p entities.ControllerParams) error {
 		return errors.New("pid: i_clamp must be >= 0")
 	}
 
-	// Reset integral to avoid windup artifacts from previous gains
 	c.i = 0
-
 	return nil
 }
 

@@ -12,7 +12,6 @@ import (
 
 	"github.com/adrianozp/gaardrail/app/entities"
 	"github.com/adrianozp/gaardrail/app/repositories/controllers"
-	"github.com/adrianozp/gaardrail/app/repositories/controllers/autopid"
 	"github.com/adrianozp/gaardrail/app/repositories/controllers/pid"
 	"github.com/adrianozp/gaardrail/app/repositories/controllers/smith"
 	"github.com/adrianozp/gaardrail/app/repositories/controllers/step"
@@ -37,11 +36,10 @@ func New(cfg config.Config) (*Controller, error) {
 	cfgNoFF := cfg
 	cfgNoFF.PID.FfGain = 0
 	available := map[string]controllers.Controller{
-		"pid":     pid.New(cfgNoFF),
-		"pidff":   pid.New(cfg),
-		"step":    step.NewStep(cfg),
-		"smith":   smith.New(cfg),
-		"autopid": autopid.New(cfg),
+		"pid":   pid.New(cfgNoFF),
+		"pidff": pid.New(cfg),
+		"step":  step.NewStep(cfg),
+		"smith": smith.New(cfg),
 	}
 
 	active, ok := available[cfg.Controller.Type]

@@ -21,7 +21,6 @@ type Config struct {
 	Controller    Controller    `mapstructure:"controller"`
 	PID           PID           `mapstructure:"pid"`
 	Smith         Smith         `mapstructure:"smith"`
-	AutoPID       AutoPID       `mapstructure:"autopid"`
 	Orchestrator  Orchestrator  `mapstructure:"orchestrator"`
 
 	// Path is the resolved config file used at load time, set after reading. It

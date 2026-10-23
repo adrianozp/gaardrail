@@ -172,3 +172,26 @@ func TestDequeue_RespectsContextCancellation(t *testing.T) {
 		t.Fatal("Dequeue did not return after context cancellation")
 	}
 }
+
+type failingQueue struct{ fakeQueue }
+
+func (f *failingQueue) Dequeue(context.Context) (entities.Message, error) {
+	return entities.Message{}, errors.New("broker down")
+}
+
+func TestDequeue_ReturnsActiveQueueErrorInsteadOfRetrying(t *testing.T) {
+	q := rawQueue(t, "kafka", map[string]func() (queue.Queue, error){
+		"kafka": func() (queue.Queue, error) { return &failingQueue{}, nil },
+	})
+	done := make(chan error, 1)
+	go func() {
+		_, err := q.Dequeue(context.Background())
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		require.EqualError(t, err, "broker down")
+	case <-time.After(time.Second):
+		t.Fatal("Dequeue kept retrying a failing queue")
+	}
+}

@@ -106,29 +106,39 @@ func (q *Queue) Enqueue(m entities.Message) (string, error) {
 // cancellation of the caller's ctx is propagated as-is.
 func (q *Queue) Dequeue(ctx context.Context) (entities.Message, error) {
 	for {
-		q.mu.RLock()
-		active := q.active
-		switched := q.switched
-		q.mu.RUnlock()
-
-		childCtx, cancel := context.WithCancel(ctx)
-		go func() {
-			select {
-			case <-switched:
-				cancel()
-			case <-childCtx.Done():
-			}
-		}()
-
-		m, err := active.Dequeue(childCtx)
-		cancel()
-
-		// Retry only when the child context was cancelled by a switch, not by
-		// the caller's ctx.
-		if err != nil && ctx.Err() == nil {
-			continue
+		active, switched := q.snapshot()
+		m, err := dequeueUntilSwitch(ctx, active, switched)
+		if err == nil || ctx.Err() != nil || !isClosed(switched) {
+			return m, err
 		}
-		return m, err
+	}
+}
+
+func (q *Queue) snapshot() (queue.Queue, chan struct{}) {
+	q.mu.RLock()
+	defer q.mu.RUnlock()
+	return q.active, q.switched
+}
+
+func dequeueUntilSwitch(ctx context.Context, active queue.Queue, switched chan struct{}) (entities.Message, error) {
+	childCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go func() {
+		select {
+		case <-switched:
+			cancel()
+		case <-childCtx.Done():
+		}
+	}()
+	return active.Dequeue(childCtx)
+}
+
+func isClosed(ch chan struct{}) bool {
+	select {
+	case <-ch:
+		return true
+	default:
+		return false
 	}
 }
 

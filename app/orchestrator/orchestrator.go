@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	metrics "github.com/adrianozp/gaardrail/internal/metrics"
@@ -19,26 +20,24 @@ type Consumer interface {
 type Orchestrator struct {
 	limiter  *rate.Limiter
 	consumer Consumer
-	done     chan struct{}
-	ctx      context.Context
 	workers  int
+	cancel   context.CancelFunc
+	wg       sync.WaitGroup
 }
+
+const idleWait = time.Second
 
 func NewOrchestrator(c Consumer, cfg config.Config) *Orchestrator {
 	return &Orchestrator{
 		consumer: c,
 		limiter:  rate.NewLimiter(rate.Limit(cfg.Orchestrator.Rate), cfg.Orchestrator.Burst),
-		done:     make(chan struct{}),
 		workers:  cfg.Orchestrator.Workers,
+		cancel:   func() {},
 	}
 }
 
 func (o *Orchestrator) Limiter() *rate.Limiter {
 	return o.limiter
-}
-
-func (o *Orchestrator) Done() <-chan struct{} {
-	return o.done
 }
 
 func (o *Orchestrator) SetDrainRate(drainRate float64) error {
@@ -49,64 +48,93 @@ func (o *Orchestrator) SetDrainRate(drainRate float64) error {
 }
 
 func (o *Orchestrator) Start(ctx context.Context) error {
-	o.ctx = ctx
-	for i := 0; i < o.workers; i++ {
-		go o.worker()
+	ctx, o.cancel = context.WithCancel(ctx)
+	for range o.workers {
+		o.wg.Go(func() { o.worker(ctx) })
 	}
-	go o.lagPoller()
+	o.wg.Go(func() { o.lagPoller(ctx) })
 	return nil
 }
 
-func (o *Orchestrator) worker() {
-	for {
-		select {
-		case <-o.ctx.Done():
-			log.Panic().Msg("orchestrator: context canceled, shutting down")
-			return
-		default:
-		}
-
-		if o.Limiter().Limit() == 0 {
-			log.Info().Msg("orchestrator: drain rate is 0, waiting")
-			time.Sleep(1 * time.Second)
-			continue
-		}
-
-		// Reserve (not Wait) so a live SetDrainRate change is always picked up.
-		// If the drain rate drops (or hits 0) while a worker is blocked in
-		// Wait, the limiter keeps sleeping on the stale near-infinite delay and
-		// never recovers when the rate is raised again. Reserve lets us cap the
-		// sleep and re-evaluate the current limit each iteration.
-		r := o.limiter.Reserve()
-		if !r.OK() {
-			continue
-		}
-		if delay := r.Delay(); delay > 0 {
-			if delay > time.Second {
-				r.Cancel()
-				time.Sleep(time.Second)
-				continue
-			}
-			time.Sleep(delay)
-		}
-
-		if _, err := o.consumer.Consume(o.ctx); err != nil {
-			log.Error().Err(err).Msg("orchestrator: error consuming message")
-		}
+func (o *Orchestrator) Stop(ctx context.Context) error {
+	o.cancel()
+	done := make(chan struct{})
+	go func() {
+		o.wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 }
 
-func (o *Orchestrator) lagPoller() {
+func (o *Orchestrator) worker(ctx context.Context) {
+	for ctx.Err() == nil {
+		if o.awaitToken(ctx) {
+			o.consume(ctx)
+		}
+	}
+	log.Info().Msg("orchestrator: worker stopped")
+}
+
+func (o *Orchestrator) awaitToken(ctx context.Context) bool {
+	if o.limiter.Limit() == 0 {
+		log.Debug().Msg("orchestrator: drain rate is 0, waiting")
+		sleep(ctx, idleWait)
+		return false
+	}
+	r := o.limiter.Reserve()
+	if !r.OK() {
+		sleep(ctx, idleWait)
+		return false
+	}
+	if r.Delay() > idleWait || !sleep(ctx, r.Delay()) {
+		r.Cancel()
+		sleep(ctx, idleWait)
+		return false
+	}
+	return true
+}
+
+func (o *Orchestrator) consume(ctx context.Context) {
+	_, err := o.consumer.Consume(ctx)
+	if err != nil && ctx.Err() == nil {
+		log.Error().Err(err).Msg("orchestrator: error consuming message")
+	}
+}
+
+func sleep(ctx context.Context, d time.Duration) bool {
+	if d <= 0 {
+		return ctx.Err() == nil
+	}
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-t.C:
+		return true
+	}
+}
+
+func (o *Orchestrator) lagPoller(ctx context.Context) {
 	t := time.NewTicker(5 * time.Second)
 	defer t.Stop()
 	for {
 		select {
-		case <-o.ctx.Done():
+		case <-ctx.Done():
 			return
 		case <-t.C:
-			if lag, err := o.consumer.Size(); err == nil {
-				metrics.Gauge(map[string]float64{"queue_lag": float64(lag)})
-			}
+			o.publishLag()
 		}
+	}
+}
+
+func (o *Orchestrator) publishLag() {
+	if lag, err := o.consumer.Size(); err == nil {
+		metrics.Gauge(map[string]float64{"queue_lag": float64(lag)})
 	}
 }

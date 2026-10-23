@@ -70,6 +70,7 @@ func Options() fx.Option {
 				OnStart: func(ctx context.Context) error {
 					return o.Start(context.Background())
 				},
+				OnStop: o.Stop,
 			})
 		}),
 	)

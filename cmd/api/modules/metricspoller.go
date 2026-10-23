@@ -59,6 +59,7 @@ func MetricsPollerLifecycle() fx.Option {
 			OnStart: func(ctx context.Context) error {
 				return ph.Start(context.Background())
 			},
+			OnStop: ph.Stop,
 		})
 	})
 }

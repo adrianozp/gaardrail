@@ -1,66 +1,54 @@
 package step_test
 
 import (
+	"math"
 	"testing"
 	"time"
 
 	"github.com/adrianozp/gaardrail/app/entities"
 	"github.com/adrianozp/gaardrail/app/repositories/controllers/step"
 	"github.com/adrianozp/gaardrail/pkg/config"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
-
-var t0 = time.Time{}
-
-func cfg(max float64) config.Config {
-	return config.Config{PID: config.PID{Max: max}}
-}
 
 func ptr(v float64) *float64 { return &v }
 
+func newStep(t *testing.T, max float64) *step.Controller {
+	t.Helper()
+	c, err := step.New(config.Config{PID: config.PID{Max: max}})
+	require.NoError(t, err)
+	return c
+}
+
 func TestStepOutputsMax(t *testing.T) {
-	c := step.NewStep(cfg(5.0))
-	out, err := c.Compute(42.0, t0.Add(time.Second))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if out != 5.0 {
-		t.Errorf("expected 5.0, got %f", out)
-	}
+	out, err := newStep(t, 5).Compute(42, time.Now())
+	require.NoError(t, err)
+	assert.Equal(t, 5.0, out)
 }
 
 func TestStepGetParamsReflectsMax(t *testing.T) {
-	c := step.NewStep(cfg(5.0))
-	p := c.GetParams()
-	if p.Max == nil {
-		t.Fatal("expected Max to be set, got nil")
-	}
-	if *p.Max != 5.0 {
-		t.Errorf("expected Max 5.0, got %f", *p.Max)
-	}
+	p := newStep(t, 5).GetParams()
+	require.NotNil(t, p.Max)
+	assert.Equal(t, 5.0, *p.Max)
 }
 
 func TestStepSetParamsNilSafe(t *testing.T) {
-	c := step.NewStep(cfg(5.0))
-	// PATCH bodies omit unchanged fields, so every pointer may be nil.
-	if err := c.SetParams(entities.ControllerParams{}); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	p := c.GetParams()
-	if p.Max == nil || *p.Max != 5.0 {
-		t.Errorf("max should be unchanged at 5.0, got %v", p.Max)
-	}
+	c := newStep(t, 5)
+	require.NoError(t, c.SetParams(entities.ControllerParams{}))
+	assert.Equal(t, 5.0, *c.GetParams().Max)
 }
 
 func TestStepSetParamsUpdatesMax(t *testing.T) {
-	c := step.NewStep(cfg(5.0))
-	if err := c.SetParams(entities.ControllerParams{Max: ptr(9.0)}); err != nil {
-		t.Fatal(err)
-	}
-	out, err := c.Compute(0, t0.Add(time.Second))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if out != 9.0 {
-		t.Errorf("expected output 9.0 after update, got %f", out)
-	}
+	c := newStep(t, 5)
+	require.NoError(t, c.SetParams(entities.ControllerParams{Max: ptr(9)}))
+	out, err := c.Compute(0, time.Now())
+	require.NoError(t, err)
+	assert.Equal(t, 9.0, out)
+}
+
+func TestStepSetParamsRejectsNaN(t *testing.T) {
+	c := newStep(t, 5)
+	require.Error(t, c.SetParams(entities.ControllerParams{Max: ptr(math.NaN())}))
+	assert.Equal(t, 5.0, *c.GetParams().Max)
 }

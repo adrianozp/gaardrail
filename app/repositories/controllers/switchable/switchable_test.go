@@ -7,6 +7,7 @@ import (
 	"github.com/adrianozp/gaardrail/app/entities"
 	"github.com/adrianozp/gaardrail/app/repositories/controllers"
 	"github.com/adrianozp/gaardrail/pkg/config"
+	"github.com/creasty/defaults"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -21,7 +22,6 @@ type fakeController struct {
 func (f *fakeController) Compute(float64, time.Time) (float64, error) { return f.output, nil }
 func (f *fakeController) GetParams() entities.ControllerParams        { return entities.ControllerParams{} }
 func (f *fakeController) SetParams(entities.ControllerParams) error   { return nil }
-func (f *fakeController) SetSetpoint(float64) error                   { return nil }
 func (f *fakeController) Reset()                                      { f.resetCalls++ }
 func (f *fakeController) Type() string                                { return f.name }
 
@@ -71,13 +71,31 @@ func TestSetType_UnknownTypeErrorsAndKeepsActive(t *testing.T) {
 	assert.Equal(t, "pid", c.Type(), "active controller must be unchanged on error")
 }
 
+func defaultConfig(t *testing.T, controllerType string) config.Config {
+	t.Helper()
+	cfg := config.Config{}
+	require.NoError(t, defaults.Set(&cfg))
+	cfg.Controller.Type = controllerType
+	return cfg
+}
+
 func TestNew_SelectsConfiguredController(t *testing.T) {
-	c, err := New(config.Config{Controller: config.Controller{Type: "step"}})
-	require.NoError(t, err)
-	assert.Equal(t, "step", c.Type())
+	for _, name := range []string{"pid", "pidff", "step", "smith"} {
+		c, err := New(defaultConfig(t, name))
+		require.NoError(t, err)
+		assert.Equal(t, name, c.Type())
+		assert.Equal(t, name, c.current().Type())
+	}
 }
 
 func TestNew_UnknownTypeErrors(t *testing.T) {
-	_, err := New(config.Config{Controller: config.Controller{Type: "banana"}})
+	_, err := New(defaultConfig(t, "banana"))
 	require.Error(t, err)
+}
+
+func TestNew_InvalidControllerConfigErrors(t *testing.T) {
+	cfg := defaultConfig(t, "pid")
+	cfg.Smith.ModelTau = 0
+	_, err := New(cfg)
+	require.ErrorContains(t, err, "controller smith")
 }

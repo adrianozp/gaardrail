@@ -27,31 +27,37 @@ type Controller struct {
 	available  map[string]controllers.Controller
 }
 
-// New builds every available controller and selects the one named by
-// cfg.Controller.Type. Returns an error for an unknown type.
-func New(cfg config.Config) (*Controller, error) {
-	// "pid" is pure PI (feedforward forced off); "pidff" is the same PI with the
-	// feedforward enabled from config (u_ff = setpoint/ff_gain). Both share the
-	// PID implementation so they behave identically apart from the feedforward.
-	cfgNoFF := cfg
-	cfgNoFF.PID.FfGain = 0
-	available := map[string]controllers.Controller{
-		"pid":   pid.New(cfgNoFF),
-		"pidff": pid.New(cfg),
-		"step":  step.NewStep(cfg),
-		"smith": smith.New(cfg),
-	}
+type factory func(config.Config) (controllers.Controller, error)
 
+var factories = map[string]factory{
+	"pid":   func(cfg config.Config) (controllers.Controller, error) { return pid.New(cfg, false) },
+	"pidff": func(cfg config.Config) (controllers.Controller, error) { return pid.New(cfg, true) },
+	"step":  func(cfg config.Config) (controllers.Controller, error) { return step.New(cfg) },
+	"smith": func(cfg config.Config) (controllers.Controller, error) { return smith.New(cfg) },
+}
+
+func New(cfg config.Config) (*Controller, error) {
+	available, err := buildAll(cfg)
+	if err != nil {
+		return nil, err
+	}
 	active, ok := available[cfg.Controller.Type]
 	if !ok {
 		return nil, fmt.Errorf("controller: unknown type %q", cfg.Controller.Type)
 	}
+	return &Controller{active: active, activeType: cfg.Controller.Type, available: available}, nil
+}
 
-	return &Controller{
-		active:     active,
-		activeType: cfg.Controller.Type,
-		available:  available,
-	}, nil
+func buildAll(cfg config.Config) (map[string]controllers.Controller, error) {
+	available := make(map[string]controllers.Controller, len(factories))
+	for name, build := range factories {
+		c, err := build(cfg)
+		if err != nil {
+			return nil, fmt.Errorf("controller %s: %w", name, err)
+		}
+		available[name] = c
+	}
+	return available, nil
 }
 
 func (c *Controller) current() controllers.Controller {
@@ -70,10 +76,6 @@ func (c *Controller) GetParams() entities.ControllerParams {
 
 func (c *Controller) SetParams(p entities.ControllerParams) error {
 	return c.current().SetParams(p)
-}
-
-func (c *Controller) SetSetpoint(setpoint float64) error {
-	return c.current().SetSetpoint(setpoint)
 }
 
 func (c *Controller) Reset() {

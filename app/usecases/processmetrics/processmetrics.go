@@ -2,12 +2,13 @@ package processmetrics
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/adrianozp/gaardrail/app/entities"
-	"github.com/adrianozp/gaardrail/internal/filter"
 	metrics "github.com/adrianozp/gaardrail/internal/metrics"
 	"github.com/adrianozp/gaardrail/pkg/config"
+	"github.com/adrianozp/gaardrail/pkg/control/filter"
 	"github.com/rs/zerolog/log"
 )
 
@@ -26,16 +27,17 @@ type ProcessMetricsUseCase struct {
 	pvFilter     *filter.Signal
 }
 
-func NewProcessMetricsUseCase(c Controller, o Orchestrator, cfg config.Config) ProcessMetricsUseCase {
-	pvFilter, err := filter.NewMeasurementFilter(cfg.MetricsPoller.FilterType, cfg.MetricsPoller.FilterSize)
+func NewProcessMetricsUseCase(c Controller, o Orchestrator, cfg config.Config) (ProcessMetricsUseCase, error) {
+	spec := filter.Spec{Kind: filter.Kind(cfg.MetricsPoller.FilterType), Size: cfg.MetricsPoller.FilterSize}
+	pvFilter, err := filter.NewMeasurement(spec)
 	if err != nil {
-		panic("processmetrics.NewProcessMetricsUseCase: " + err.Error())
+		return ProcessMetricsUseCase{}, fmt.Errorf("processmetrics: %w", err)
 	}
 	return ProcessMetricsUseCase{
 		controller:   c,
 		orchestrator: o,
 		pvFilter:     pvFilter,
-	}
+	}, nil
 }
 
 func (u ProcessMetricsUseCase) Process(m entities.Metrics) error {

@@ -19,9 +19,11 @@ type event struct {
 // channel. Gauge and Incr never block: if the channel is full, the event is
 // dropped silently (metrics are best-effort).
 type AsyncRecorder struct {
-	inner Recorder
-	ch    chan event
-	wg    sync.WaitGroup
+	inner  Recorder
+	ch     chan event
+	wg     sync.WaitGroup
+	mu     sync.RWMutex
+	closed bool
 }
 
 // NewAsync returns an AsyncRecorder and a stop function.
@@ -35,23 +37,35 @@ func NewAsync(r Recorder, bufSize int) (*AsyncRecorder, func()) {
 	}
 	a.wg.Add(1)
 	go a.worker()
-	stop := func() {
+	return a, a.stop
+}
+
+func (a *AsyncRecorder) stop() {
+	a.mu.Lock()
+	if !a.closed {
+		a.closed = true
 		close(a.ch)
-		a.wg.Wait()
 	}
-	return a, stop
+	a.mu.Unlock()
+	a.wg.Wait()
 }
 
 func (a *AsyncRecorder) Gauge(values map[string]float64) {
-	select {
-	case a.ch <- event{kind: kindGauge, gauges: values}:
-	default:
-	}
+	a.send(event{kind: kindGauge, gauges: values})
 }
 
 func (a *AsyncRecorder) Incr(names []string) {
+	a.send(event{kind: kindIncr, names: names})
+}
+
+func (a *AsyncRecorder) send(e event) {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	if a.closed {
+		return
+	}
 	select {
-	case a.ch <- event{kind: kindIncr, names: names}:
+	case a.ch <- e:
 	default:
 	}
 }

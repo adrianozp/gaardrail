@@ -92,3 +92,34 @@ func TestAsyncRecorder_FullChannelDropsSilently(t *testing.T) {
 	stop()
 	// At least one event delivered; test just verifies no deadlock/panic.
 }
+
+func TestAsyncRecorder_SendAfterStopIsDropped(t *testing.T) {
+	rec := &recordingRecorder{}
+	async, stop := metrics.NewAsync(rec, 16)
+	stop()
+
+	async.Gauge(map[string]float64{"cpu": 1})
+	async.Incr([]string{"messages_total"})
+
+	rec.mu.Lock()
+	defer rec.mu.Unlock()
+	if len(rec.gauges) != 0 || len(rec.incrs) != 0 {
+		t.Fatalf("events recorded after stop: %v %v", rec.gauges, rec.incrs)
+	}
+}
+
+func TestAsyncRecorder_StopIsIdempotent(t *testing.T) {
+	_, stop := metrics.NewAsync(&recordingRecorder{}, 1)
+	stop()
+	stop()
+}
+
+func TestAsyncRecorder_ConcurrentSendAndStop(t *testing.T) {
+	async, stop := metrics.NewAsync(&recordingRecorder{}, 1)
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Go(func() { async.Gauge(map[string]float64{"x": 1}) })
+	}
+	wg.Go(stop)
+	wg.Wait()
+}

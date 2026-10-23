@@ -10,8 +10,6 @@ type Controller interface {
 	Compute(measured float64, measureTime time.Time) (float64, error)
 	GetParams() entities.ControllerParams
 	SetParams(p entities.ControllerParams) error
-	SetSetpoint(setpoint float64) error
 	Reset()
-	// Type returns the controller's identifier (e.g. "pid", "step").
 	Type() string
 }

@@ -93,3 +93,22 @@ func TestPollingHandler_ContextCancellationExitsCleanly(t *testing.T) {
 		t.Fatal("goroutine did not exit after context cancellation")
 	}
 }
+
+func TestPollingHandler_StopExitsLoop(t *testing.T) {
+	handler := pollmetrics.New(mocks.NewMetricsReader(t), mocks.NewProcessMetrics(t),
+		config.Config{MetricsPoller: config.MetricsPoller{IntervalMs: 60000}})
+	require.NoError(t, handler.Start(context.Background()))
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, handler.Stop(ctx))
+	select {
+	case <-handler.Done():
+	default:
+		t.Fatal("loop still running after Stop returned")
+	}
+}
+
+func TestPollingHandler_StopBeforeStartIsNoOp(t *testing.T) {
+	handler := pollmetrics.New(mocks.NewMetricsReader(t), mocks.NewProcessMetrics(t), config.Config{})
+	require.NoError(t, handler.Stop(context.Background()))
+}

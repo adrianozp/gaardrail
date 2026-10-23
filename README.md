@@ -108,7 +108,6 @@ The active controller is selected by `controller.type` and can be switched at ru
 | `pidff` | Same PI with feedforward (`u_ff = setpoint/ff_gain`). |
 | `smith` | Smith predictor (PI + internal FOPDT model) for dead-time compensation. |
 | `step` | Open-loop constant output (`max`), used for identification experiments. |
-| `autopid` | **Self-tuning**: runs an open-loop step, identifies a FOPDT model (two-point Smith method), computes the gains automatically (AMIGO or SIMC) and closes the loop. |
 
 ## Message consumption
 
@@ -161,7 +160,7 @@ metrics_poller:
   mappings:
     '<promql query>': cpu     # maps a query to the process variable
 controller:
-  type: "pidff"               # pid | pidff | smith | step | autopid
+  type: "pidff"               # pid | pidff | smith | step
 pid:
   setpoint: 50                # target resource utilization (%)
   kp: 0.058
@@ -171,7 +170,7 @@ pid:
   i_clamp: 40                 # anti-windup bound
 ```
 
-`smith` and `autopid` have their own sections (internal FOPDT model and identification/tuning settings) — see the comments in [config/config.yaml](config/config.yaml).
+`smith` has its own section (internal FOPDT model) — see the comments in [config/config.yaml](config/config.yaml).
 
 ## HTTP API
 

@@ -58,12 +58,3 @@ smith:
   model_theta: 61.74 # EFFECTIVE delay (continuous theta + ~T of ZOH/sampling) -> d=1 sample
   sample_seconds: 5.0 # sampling period T (60.0 in production)
   filter_size: 1 # raw metric at 60s is already an average of ~1300 queries/min; no extra MA
-autopid: # self-tuning: open-loop step -> FOPDT (2-point) -> automatic gains
-  tuning_rule: amigo # amigo (Astrom-Hagglund) | simc (Skogestad)
-  mode: pi # pi | pid (rule variant; production runs PI)
-  tau_c: 0 # SIMC: desired closed-loop time constant (s); 0 => uses theta_eff (robust)
-  baseline_output: 0 # baseline drain rate; 0 => pid.min
-  step_output: 0 # drain rate during the step; 0 => pid.max
-  baseline_seconds: 120 # baseline duration before the step
-  identify_seconds: 600 # step duration (~10 samples at T=60s)
-  # operating limits (min/max/i_clamp/setpoint/filter_size) inherited from pid.*

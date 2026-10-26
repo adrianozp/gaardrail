@@ -109,6 +109,42 @@ The active controller is selected by `controller.type` and can be switched at ru
 | `smith` | Smith predictor (PI + internal FOPDT model) for dead-time compensation. |
 | `step` | Open-loop constant output (`max`), used for identification experiments. |
 
+## Library
+
+The controllers are importable on their own, with no global metrics and no app config:
+
+```go
+import (
+    "github.com/adrianozp/gaardrail/pkg/control"
+    "github.com/adrianozp/gaardrail/pkg/control/filter"
+)
+
+pi, err := control.NewPID(control.PIDParams{
+    Kp: 0.058, Ki: 0.009, Setpoint: 50,
+    SetpointFilter: filter.Spec{Kind: filter.MovingAverage, Size: 4},
+    Limits:         control.Limits{Min: 0, Max: 50, IClamp: 40},
+})
+rate, terms, err := pi.Compute(cpuPercent, time.Now())
+```
+
+Every controller implements `control.Controller`:
+
+| Method | Description |
+|--------|-------------|
+| `Compute(measured, at) (output, Terms, error)` | One control step. The first sample never integrates; a sample older than the previous one returns `ErrOutdatedMeasurement`. |
+| `SetSetpoint(v) error` | Moves the setpoint through the setpoint filter. |
+| `Reset()` | Clears the integral, filters and history. |
+
+| Constructor | Params |
+|-------------|--------|
+| `NewPID(PIDParams)` | `Kp`, `Ki`, `Kd`, `FFGain` (0 disables feedforward), `Setpoint`, `SetpointFilter`, `Limits` |
+| `NewSmith(SmithParams)` | `Kp`, `Ki`, `Setpoint`, `SetpointFilter`, `Model{K, Tau, Theta}`, `SampleSeconds`, `Limits` |
+| `NewStep(output)` | constant open-loop output |
+
+`PID` and `Smith` also expose `Params()` and `SetParams(...)`; all methods are safe for concurrent use. `Terms` reports `Setpoint`, `Measured`, `Error`, `P`, `I`, `D`, `FF`, `Output`, `Feedback` and `Prediction` for your own metrics. Invalid params return `ErrInvalidLimits`, `ErrNegativeIClamp`, `ErrInvalidModel`, `ErrInvalidSetpoint`, `ErrInvalidMeasurement` or `ErrInvalidOutput`.
+
+`filter.NewMeasurement(Spec)` and `filter.NewReference(Spec)` build the measurement and setpoint filters as `*filter.Signal` (`Filter`, `Seed`, `Reset`, `Spec`).
+
 ## Message consumption
 
 Each `Consume()` call follows a strict sequence:
@@ -144,33 +180,31 @@ Current implementations: Kafka and constant (queue), MySQL (target); Prometheus 
 
 ## Configuration
 
-`config/config.yaml` is the fully annotated reference; fields can be overridden with `APP_*` environment variables. The core sections:
+[config/config.yaml](config/config.yaml) is the reference; any field can be overridden with an `APP_*` environment variable (`pid.kp` → `APP_PID_KP`).
 
-```yaml
-queue:
-  protocol: constant          # constant | kafka
-target:
-  protocol: sql
-  driver: mysql
-  dsn: "root:root@tcp(localhost:3306)/gaardrail"
-metrics_poller:
-  interval_ms: 5000           # control period T
-  protocol: prometheusapi
-  endpoint: "http://localhost:9090/api/v1/query"
-  mappings:
-    '<promql query>': cpu     # maps a query to the process variable
-controller:
-  type: "pidff"               # pid | pidff | smith | step
-pid:
-  setpoint: 50                # target resource utilization (%)
-  kp: 0.058
-  ki: 0.009
-  min: 0                      # drain rate bounds (msgs/s)
-  max: 50
-  i_clamp: 40                 # anti-windup bound
-```
-
-`smith` has its own section (internal FOPDT model) — see the comments in [config/config.yaml](config/config.yaml).
+| Section | Field | Meaning |
+|---------|-------|---------|
+| `queue` | `protocol` | `constant` (synthetic queue that always emits `query`, no broker needed) or `kafka` |
+| `target` | `protocol`, `driver`, `dsn` | where messages are pushed; `sql` + `mysql` today |
+| `target.tls` | `enabled` | encrypt the database connection (mysql only) |
+| | `skip_verify` | encrypt without verifying the server certificate (self-signed, tests) |
+| | `ca_file`, `server_name` | optional PEM CA bundle and name for full verification |
+| `metrics_poller` | `interval_ms` | control period T (5000 locally; 60000 for CloudWatch-class providers) |
+| | `protocol`, `endpoint` | `prometheusapi`, `exporter`, `json` or `cloudwatch` |
+| | `mappings` | query → process variable (`cpu`). Map the raw value, as a real provider delivers it: `irate` over a window of at least 3× the scrape interval (`[15s]` for a 5s scrape, `[3m]` for 60s). Smoothing belongs to `filter_type` / `filter_size`. |
+| `controller` | `type` | `pid`, `pidff`, `smith` or `step` |
+| `orchestrator` | `rate`, `workers`, `burst` | initial drain rate, consumer goroutines, limiter burst |
+| `pid` | `setpoint` | target utilization (%) |
+| | `kp`, `ki`, `kd` | gains; the defaults are the PI+FF baseline identified at T=10s |
+| | `min`, `max` | drain-rate bounds (msgs/s); leave headroom above the steady-state drain (~22 at setpoint 50%) |
+| | `i_clamp` | anti-windup bound; must reach the steady-state drain, since the PID is position-form |
+| | `ff_gain` | feedforward `u_ff = setpoint / ff_gain`, the identified static gain; 0 disables |
+| | `setpoint_filter_tau` | soft-start in seconds (~2T); or `setpoint_filter_type` / `setpoint_filter_size` |
+| `smith` | `kp`, `ki` | keep them gentle: high gains oscillate at T=60s |
+| | `model_k` | static gain of the identified FOPDT (%CPU per msg/s) |
+| | `model_tau` | time constant (s) |
+| | `model_theta` | effective delay: continuous θ plus about T of sampling/ZOH |
+| | `sample_seconds` | sampling period T; must match `metrics_poller.interval_ms` |
 
 ## HTTP API
 

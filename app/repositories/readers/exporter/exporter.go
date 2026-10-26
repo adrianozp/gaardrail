@@ -32,40 +32,39 @@ func New(cfg config.Config) *Reader {
 }
 
 func (r *Reader) Read(ctx context.Context) (entities.Metrics, error) {
+	mfs, err := r.scrape(ctx)
+	if err != nil {
+		return entities.Metrics{}, err
+	}
+	metric := entities.Metrics{MeasureTime: clock.Now(), Metrics: make(map[string]float64)}
+	for source, domain := range r.mappings {
+		mf, ok := mfs[source]
+		if ok && len(mf.GetMetric()) > 0 {
+			metric.Metrics[domain] = sampleValue(mf.GetMetric()[0])
+		}
+	}
+	return metric, nil
+}
+
+func (r *Reader) scrape(ctx context.Context) (map[string]*dto.MetricFamily, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, r.endpoint, nil)
 	if err != nil {
-		return entities.Metrics{}, err
+		return nil, err
 	}
-
 	resp, err := r.client.Do(req)
 	if err != nil {
-		return entities.Metrics{}, err
+		return nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
-
 	if resp.StatusCode != http.StatusOK {
-		return entities.Metrics{}, fmt.Errorf("exporter: unexpected status %d", resp.StatusCode)
+		return nil, fmt.Errorf("exporter: unexpected status %d", resp.StatusCode)
 	}
-
 	parser := expfmt.NewTextParser(model.UTF8Validation)
 	mfs, err := parser.TextToMetricFamilies(resp.Body)
 	if err != nil && len(mfs) == 0 {
-		return entities.Metrics{}, fmt.Errorf("exporter: parse error: %w", err)
+		return nil, fmt.Errorf("exporter: parse error: %w", err)
 	}
-
-	metric := entities.Metrics{
-		MeasureTime: clock.Now(),
-		Metrics:     make(map[string]float64),
-	}
-	for source, domain := range r.mappings {
-		mf, ok := mfs[source]
-		if !ok || len(mf.GetMetric()) == 0 {
-			continue
-		}
-		metric.Metrics[domain] = sampleValue(mf.GetMetric()[0])
-	}
-
-	return metric, nil
+	return mfs, nil
 }
 
 func sampleValue(m *dto.Metric) float64 {

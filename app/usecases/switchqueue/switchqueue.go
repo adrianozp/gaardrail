@@ -8,15 +8,12 @@ import (
 
 //go:generate mockery --all --output=mocks --outpkg=mocks
 
-// Queue is the runtime-switchable queue. Satisfied by *switchable.Queue.
 type Queue interface {
 	SetType(t string) error
 	Type() string
 	Available() []string
 }
 
-// ConfigStore persists runtime changes back to the config file so they survive
-// a restart.
 type ConfigStore interface {
 	Set(updates map[string]any) error
 }
@@ -30,9 +27,6 @@ func New(q Queue, s ConfigStore) UseCase {
 	return UseCase{queue: q, store: s}
 }
 
-// Switch changes the active queue at runtime, updates the dashboard gauge so the
-// switch is visible, and persists the choice so it is restored on restart. A
-// failed persist is logged but does not undo the runtime switch.
 func (u UseCase) Switch(t string) error {
 	if err := u.queue.SetType(t); err != nil {
 		return err

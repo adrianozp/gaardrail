@@ -10,7 +10,6 @@ func init() {
 	envKeys = append(envKeys, "queue.protocol", "queue.capacity", "queue.query")
 }
 
-// TypeCode maps a queue protocol to a numeric code for dashboard display.
 func TypeCode(protocol string) float64 {
 	switch protocol {
 	case "kafka":

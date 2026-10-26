@@ -15,9 +15,6 @@ type event struct {
 	names  []string
 }
 
-// AsyncRecorder wraps a Recorder and dispatches all sends through a buffered
-// channel. Gauge and Incr never block: if the channel is full, the event is
-// dropped silently (metrics are best-effort).
 type AsyncRecorder struct {
 	inner  Recorder
 	ch     chan event
@@ -26,10 +23,6 @@ type AsyncRecorder struct {
 	closed bool
 }
 
-// NewAsync returns an AsyncRecorder and a stop function.
-// bufSize is the number of events the channel can buffer before drops occur.
-// The stop function closes the channel and waits for the worker to drain all
-// buffered events before returning. Call it during graceful shutdown.
 func NewAsync(r Recorder, bufSize int) (*AsyncRecorder, func()) {
 	a := &AsyncRecorder{
 		inner: r,

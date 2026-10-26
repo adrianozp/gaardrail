@@ -1,8 +1,3 @@
-// Package switchable wraps the available controllers and lets the active one be
-// swapped at runtime. It implements controllers.Controller by delegating every
-// call to the currently selected controller, so consumers never know the
-// underlying implementation changed. The switch logic and all edge cases live
-// here, keeping use cases and FX modules free of branching.
 package switchable
 
 import (
@@ -18,8 +13,6 @@ import (
 	"github.com/adrianozp/gaardrail/pkg/config"
 )
 
-// Controller delegates to whichever underlying controller is currently active.
-// Each underlying instance stays alive across switches and keeps its own params.
 type Controller struct {
 	mu         sync.RWMutex
 	active     controllers.Controller
@@ -88,9 +81,6 @@ func (c *Controller) Type() string {
 	return c.activeType
 }
 
-// SetType swaps the active controller. The newly activated controller is reset
-// so stale integral/derivative state does not leak across a switch. Switching
-// to the already-active type is a no-op. Unknown types return an error.
 func (c *Controller) SetType(t string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()

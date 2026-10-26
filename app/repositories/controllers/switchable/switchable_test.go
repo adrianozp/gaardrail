@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// fakeController records calls so we can assert delegation and reset behavior.
 type fakeController struct {
 	name       string
 	resetCalls int

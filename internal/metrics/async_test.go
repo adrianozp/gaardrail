@@ -7,7 +7,6 @@ import (
 	metrics "github.com/adrianozp/gaardrail/internal/metrics"
 )
 
-// recordingRecorder captures all events for test assertions.
 type recordingRecorder struct {
 	mu     sync.Mutex
 	gauges []map[string]float64
@@ -31,7 +30,7 @@ func TestAsyncRecorder_DeliverGauge(t *testing.T) {
 	async, stop := metrics.NewAsync(rec, 16)
 
 	async.Gauge(map[string]float64{"cpu": 42.0})
-	stop() // drain and wait
+	stop()
 
 	rec.mu.Lock()
 	defer rec.mu.Unlock()
@@ -48,7 +47,7 @@ func TestAsyncRecorder_DeliverIncr(t *testing.T) {
 	async, stop := metrics.NewAsync(rec, 16)
 
 	async.Incr([]string{"messages_total"})
-	stop() // drain and wait
+	stop()
 
 	rec.mu.Lock()
 	defer rec.mu.Unlock()
@@ -67,7 +66,7 @@ func TestAsyncRecorder_StopDrainsRemaining(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		async.Gauge(map[string]float64{"tick": float64(i)})
 	}
-	stop() // must drain all 10 before returning
+	stop()
 
 	rec.mu.Lock()
 	defer rec.mu.Unlock()
@@ -78,10 +77,8 @@ func TestAsyncRecorder_StopDrainsRemaining(t *testing.T) {
 
 func TestAsyncRecorder_FullChannelDropsSilently(t *testing.T) {
 	rec := &recordingRecorder{}
-	// bufSize=1: second send may drop
 	async, stop := metrics.NewAsync(rec, 1)
 
-	// Both sends must return immediately (no block).
 	done := make(chan struct{})
 	go func() {
 		async.Gauge(map[string]float64{"a": 1})
@@ -90,7 +87,6 @@ func TestAsyncRecorder_FullChannelDropsSilently(t *testing.T) {
 	}()
 	<-done
 	stop()
-	// At least one event delivered; test just verifies no deadlock/panic.
 }
 
 func TestAsyncRecorder_SendAfterStopIsDropped(t *testing.T) {

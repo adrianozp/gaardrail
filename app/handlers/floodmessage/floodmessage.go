@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -29,14 +30,9 @@ func RegisterFloodMessageRoutes(router *gin.Engine, h *FloodMessageHandler) {
 }
 
 func (h *FloodMessageHandler) Handle(c *gin.Context) {
-	quantityStr := c.DefaultQuery("quantity", "1")
-	quantity, err := strconv.Atoi(quantityStr)
-	if err != nil || quantity < 1 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "quantity must be at least 1"})
-		return
-	}
-	if quantity > maxQuantity {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "quantity exceeds max (10000)"})
+	quantity, err := parseQuantity(c.DefaultQuery("quantity", "1"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -47,12 +43,28 @@ func (h *FloodMessageHandler) Handle(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusAccepted, gin.H{"queued": quantity})
+	go h.flood(req, quantity)
+}
 
-	go func() {
-		for i := 0; i < quantity; i++ {
-			if _, err := h.usecase.Create(req.toMessage()); err != nil {
-				log.Error().Err(err).Msg("flood: failed to enqueue message")
-			}
-		}
-	}()
+func parseQuantity(raw string) (int, error) {
+	quantity, err := strconv.Atoi(raw)
+	if err != nil || quantity < 1 {
+		return 0, errors.New("quantity must be at least 1")
+	}
+	if quantity > maxQuantity {
+		return 0, errors.New("quantity exceeds max (10000)")
+	}
+	return quantity, nil
+}
+
+func (h *FloodMessageHandler) flood(req floodRequest, quantity int) {
+	for i := 0; i < quantity; i++ {
+		h.enqueue(req)
+	}
+}
+
+func (h *FloodMessageHandler) enqueue(req floodRequest) {
+	if _, err := h.usecase.Create(req.toMessage()); err != nil {
+		log.Error().Err(err).Msg("flood: failed to enqueue message")
+	}
 }

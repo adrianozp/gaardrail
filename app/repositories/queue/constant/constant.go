@@ -10,9 +10,6 @@ import (
 	"github.com/adrianozp/gaardrail/pkg/uuid"
 )
 
-// Queue is a queue connector whose Dequeue always returns a fresh message
-// carrying the same configured query. It never drains: the payload is fixed and
-// set at startup (config) or at runtime via SetQuery.
 type Queue struct {
 	mu    sync.RWMutex
 	query string
@@ -69,8 +66,6 @@ func (q *Queue) Ack(_ context.Context, _ entities.Message) error {
 	return nil
 }
 
-// Size returns -1 to signal an infinite queue (not applicable), distinguishing
-// it from a genuinely empty queue (0).
 func (q *Queue) Size() (int64, error) {
 	return -1, nil
 }

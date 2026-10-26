@@ -1,6 +1,8 @@
 version: "2"
 linters:
   exclusions:
+    paths:
+      - "(^|/)mocks/"
     rules:
       # model.NameValidationScheme is a documented escape hatch for globally
       # toggling prometheus/common's metric-name validation scheme; it is

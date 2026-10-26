@@ -7,12 +7,10 @@ import (
 )
 
 var (
-	gauges   sync.Map // map[string]prom.Gauge
-	counters sync.Map // map[string]prom.Counter
+	gauges   sync.Map
+	counters sync.Map
 )
 
-// Recorder is the Prometheus implementation of internal/metrics.Recorder.
-// Metrics are registered lazily with the "gaardrail_" prefix.
 type Recorder struct{}
 
 func (Recorder) Gauge(values map[string]float64) {

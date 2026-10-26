@@ -68,7 +68,6 @@ func TestPollingHandler_ReadErrorDoesNotStopLoop(t *testing.T) {
 
 	select {
 	case <-processed:
-		// success: loop continued past the error
 	case <-time.After(500 * time.Millisecond):
 		t.Fatal("process was never called after read error — loop may have stopped")
 	}
@@ -80,7 +79,6 @@ func TestPollingHandler_ContextCancellationExitsCleanly(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// long interval — we cancel before the first tick
 	handler := pollmetrics.New(mockReader, mockProcess, config.Config{MetricsPoller: config.MetricsPoller{IntervalMs: 3600000}})
 	require.NoError(t, handler.Start(ctx))
 
@@ -88,7 +86,6 @@ func TestPollingHandler_ContextCancellationExitsCleanly(t *testing.T) {
 
 	select {
 	case <-handler.Done():
-		// success
 	case <-time.After(200 * time.Millisecond):
 		t.Fatal("goroutine did not exit after context cancellation")
 	}

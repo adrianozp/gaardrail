@@ -53,41 +53,51 @@ func (r *SQSRepository) Enqueue(m entities.Message) (string, error) {
 
 func (r *SQSRepository) Dequeue(ctx context.Context) (entities.Message, error) {
 	for {
-		out, err := r.client.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
-			QueueUrl:            aws.String(r.cfg.QueueURL),
-			MaxNumberOfMessages: r.cfg.MaxMessages,
-			WaitTimeSeconds:     r.cfg.WaitTimeSeconds,
-			VisibilityTimeout:   r.cfg.VisibilityTimeout,
-		})
+		msgs, err := r.receive(ctx)
 		if err != nil {
 			return entities.Message{}, err
 		}
-		if len(out.Messages) == 0 {
-			if ctx.Err() != nil {
-				return entities.Message{}, ctx.Err()
-			}
-			continue
+		if len(msgs) > 0 {
+			return r.toEntity(msgs[0])
 		}
-
-		sqsMsg := out.Messages[0]
-		log.Debug().Msg("sqs: msg dequeued")
-
-		var model sqsMessage
-		if err := json.Unmarshal([]byte(aws.ToString(sqsMsg.Body)), &model); err != nil {
-			return entities.Message{}, err
+		if ctx.Err() != nil {
+			return entities.Message{}, ctx.Err()
 		}
+	}
+}
 
-		entity := model.ToMessage()
-		receiptHandle := sqsMsg.ReceiptHandle
-		queueURL := r.cfg.QueueURL
-		entity.Ack = func() error {
-			_, err := r.client.DeleteMessage(context.Background(), &sqs.DeleteMessageInput{
-				QueueUrl:      aws.String(queueURL),
-				ReceiptHandle: receiptHandle,
-			})
-			return err
-		}
-		return entity, nil
+func (r *SQSRepository) receive(ctx context.Context) ([]sqstypes.Message, error) {
+	out, err := r.client.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
+		QueueUrl:            aws.String(r.cfg.QueueURL),
+		MaxNumberOfMessages: r.cfg.MaxMessages,
+		WaitTimeSeconds:     r.cfg.WaitTimeSeconds,
+		VisibilityTimeout:   r.cfg.VisibilityTimeout,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out.Messages, nil
+}
+
+func (r *SQSRepository) toEntity(sqsMsg sqstypes.Message) (entities.Message, error) {
+	log.Debug().Msg("sqs: msg dequeued")
+	var model sqsMessage
+	if err := json.Unmarshal([]byte(aws.ToString(sqsMsg.Body)), &model); err != nil {
+		return entities.Message{}, err
+	}
+	entity := model.ToMessage()
+	entity.Ack = r.deleter(sqsMsg.ReceiptHandle)
+	return entity, nil
+}
+
+func (r *SQSRepository) deleter(receiptHandle *string) func() error {
+	queueURL := r.cfg.QueueURL
+	return func() error {
+		_, err := r.client.DeleteMessage(context.Background(), &sqs.DeleteMessageInput{
+			QueueUrl:      aws.String(queueURL),
+			ReceiptHandle: receiptHandle,
+		})
+		return err
 	}
 }
 

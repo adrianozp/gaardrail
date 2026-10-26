@@ -16,16 +16,15 @@ import (
 
 type Config struct {
 	DSN    string
-	Driver string // "mysql" or "postgres"; defaults to "mysql" when empty
+	Driver string
 	TLS    TLSConfig
 }
 
-// TLSConfig enables encrypted communication with the database (mysql only).
 type TLSConfig struct {
 	Enabled    bool
-	CAFile     string // optional PEM CA bundle for server verification
-	SkipVerify bool   // encrypt but do not verify the server certificate (testing)
-	ServerName string // optional, used for certificate verification
+	CAFile     string
+	SkipVerify bool
+	ServerName string
 }
 
 type Client struct {
@@ -37,28 +36,15 @@ func New(cfg Config) (*Client, error) {
 	if driver == "" {
 		driver = "mysql"
 	}
-
-	dsn := cfg.DSN
-	if cfg.TLS.Enabled {
-		if driver != "mysql" {
-			return nil, fmt.Errorf("sqlclient: tls is only supported for the mysql driver, got %q", driver)
-		}
-		tlsName, err := registerMySQLTLS(cfg.TLS)
-		if err != nil {
-			return nil, fmt.Errorf("sqlclient: tls: %w", err)
-		}
-		dsn = withDSNParam(dsn, "tls", tlsName)
+	dsn, err := secureDSN(driver, cfg)
+	if err != nil {
+		return nil, err
 	}
-
 	db, err := sql.Open(driver, dsn)
 	if err != nil {
 		return nil, fmt.Errorf("sqlclient: open: %w", err)
 	}
-	db.SetMaxOpenConns(20)
-	db.SetMaxIdleConns(10)
-	db.SetConnMaxLifetime(5 * time.Minute)
-	db.SetConnMaxIdleTime(2 * time.Minute)
-
+	configurePool(db)
 	if err := db.Ping(); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("sqlclient: ping: %w", err)
@@ -66,9 +52,27 @@ func New(cfg Config) (*Client, error) {
 	return &Client{db: db}, nil
 }
 
-// registerMySQLTLS resolves the value to use for the DSN "tls" parameter.
-// For the simple cases it returns a built-in name; when a CA bundle or a
-// server name is given it registers a custom *tls.Config and returns its name.
+func secureDSN(driver string, cfg Config) (string, error) {
+	if !cfg.TLS.Enabled {
+		return cfg.DSN, nil
+	}
+	if driver != "mysql" {
+		return "", fmt.Errorf("sqlclient: tls is only supported for the mysql driver, got %q", driver)
+	}
+	tlsName, err := registerMySQLTLS(cfg.TLS)
+	if err != nil {
+		return "", fmt.Errorf("sqlclient: tls: %w", err)
+	}
+	return withDSNParam(cfg.DSN, "tls", tlsName), nil
+}
+
+func configurePool(db *sql.DB) {
+	db.SetMaxOpenConns(20)
+	db.SetMaxIdleConns(10)
+	db.SetConnMaxLifetime(5 * time.Minute)
+	db.SetConnMaxIdleTime(2 * time.Minute)
+}
+
 func registerMySQLTLS(cfg TLSConfig) (string, error) {
 	if cfg.SkipVerify {
 		return "skip-verify", nil
@@ -76,23 +80,10 @@ func registerMySQLTLS(cfg TLSConfig) (string, error) {
 	if cfg.CAFile == "" && cfg.ServerName == "" {
 		return "true", nil
 	}
-
-	tlsCfg := &tls.Config{
-		ServerName: cfg.ServerName,
-		MinVersion: tls.VersionTLS12,
+	tlsCfg := &tls.Config{ServerName: cfg.ServerName, MinVersion: tls.VersionTLS12}
+	if err := loadRootCAs(tlsCfg, cfg.CAFile); err != nil {
+		return "", err
 	}
-	if cfg.CAFile != "" {
-		pem, err := os.ReadFile(cfg.CAFile)
-		if err != nil {
-			return "", fmt.Errorf("read ca file: %w", err)
-		}
-		pool := x509.NewCertPool()
-		if !pool.AppendCertsFromPEM(pem) {
-			return "", fmt.Errorf("no valid certificate found in ca file %q", cfg.CAFile)
-		}
-		tlsCfg.RootCAs = pool
-	}
-
 	const name = "gaardrail-custom"
 	if err := mysql.RegisterTLSConfig(name, tlsCfg); err != nil {
 		return "", err
@@ -100,7 +91,22 @@ func registerMySQLTLS(cfg TLSConfig) (string, error) {
 	return name, nil
 }
 
-// withDSNParam appends key=value to a DSN query string, choosing "?" or "&".
+func loadRootCAs(tlsCfg *tls.Config, caFile string) error {
+	if caFile == "" {
+		return nil
+	}
+	pem, err := os.ReadFile(caFile)
+	if err != nil {
+		return fmt.Errorf("read ca file: %w", err)
+	}
+	pool := x509.NewCertPool()
+	if !pool.AppendCertsFromPEM(pem) {
+		return fmt.Errorf("no valid certificate found in ca file %q", caFile)
+	}
+	tlsCfg.RootCAs = pool
+	return nil
+}
+
 func withDSNParam(dsn, key, value string) string {
 	sep := "?"
 	if strings.ContainsRune(dsn, '?') {
@@ -109,7 +115,6 @@ func withDSNParam(dsn, key, value string) string {
 	return dsn + sep + key + "=" + value
 }
 
-// NewFromDB creates a Client from an existing *sql.DB. Useful for testing.
 func NewFromDB(db *sql.DB) *Client {
 	return &Client{db: db}
 }

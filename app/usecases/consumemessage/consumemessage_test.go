@@ -94,11 +94,11 @@ func TestConsume_RecordsDequeueTime(t *testing.T) {
 		call++
 		switch call {
 		case 1:
-			return t0 // consumeStartTime
+			return t0
 		case 2:
-			return t0.Add(200 * time.Millisecond) // after Dequeue
+			return t0.Add(200 * time.Millisecond)
 		default:
-			return t0.Add(250 * time.Millisecond) // sendMetrics calls
+			return t0.Add(250 * time.Millisecond)
 		}
 	})
 	t.Cleanup(func() { clock.With(nil) })

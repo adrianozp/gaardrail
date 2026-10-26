@@ -7,6 +7,7 @@ import (
 
 type Client struct {
 	client    sarama.Client
+	base      sarama.Consumer
 	consumer  sarama.PartitionConsumer
 	producer  sarama.SyncProducer
 	manager   sarama.OffsetManager
@@ -15,81 +16,91 @@ type Client struct {
 	partition int32
 }
 
+type closer interface {
+	Close() error
+}
+
 func New(cfg config.Config) (*Client, error) {
+	client, err := connect(cfg.Kafka)
+	if err != nil {
+		return nil, err
+	}
+	c := &Client{client: client, topic: cfg.Kafka.Topic, partition: cfg.Kafka.Partition}
+	if err := c.open(cfg.Kafka); err != nil {
+		_ = c.Close()
+		return nil, err
+	}
+	return c, nil
+}
+
+func newSaramaConfig() *sarama.Config {
 	saramaCfg := sarama.NewConfig()
 	saramaCfg.Consumer.Return.Errors = true
 	saramaCfg.Consumer.Offsets.AutoCommit.Enable = false
 	saramaCfg.Producer.Return.Successes = true
+	return saramaCfg
+}
 
-	client, err := sarama.NewClient(cfg.Kafka.Brokers, saramaCfg)
+func connect(k config.Kafka) (sarama.Client, error) {
+	client, err := sarama.NewClient(k.Brokers, newSaramaConfig())
 	if err != nil {
 		return nil, err
 	}
-
-	if err := ensureTopic(client, cfg.Kafka.Topic, cfg.Kafka.Partition+1); err != nil {
+	if err := prepareTopic(client, k); err != nil {
 		_ = client.Close()
 		return nil, err
 	}
+	return client, nil
+}
 
-	if err := client.RefreshMetadata(cfg.Kafka.Topic); err != nil {
-		_ = client.Close()
-		return nil, err
+func prepareTopic(client sarama.Client, k config.Kafka) error {
+	if err := ensureTopic(client, k.Topic, k.Partition+1); err != nil {
+		return err
 	}
+	return client.RefreshMetadata(k.Topic)
+}
 
-	consumer, err := sarama.NewConsumerFromClient(client)
+func (c *Client) open(k config.Kafka) error {
+	steps := []func(config.Kafka) error{c.openConsumer, c.openOffsets, c.openPartition, c.openProducer}
+	for _, step := range steps {
+		if err := step(k); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *Client) openConsumer(config.Kafka) error {
+	base, err := sarama.NewConsumerFromClient(c.client)
+	c.base = base
+	return err
+}
+
+func (c *Client) openOffsets(k config.Kafka) error {
+	manager, err := sarama.NewOffsetManagerFromClient(k.GroupID, c.client)
 	if err != nil {
-		_ = client.Close()
-		return nil, err
+		return err
 	}
+	c.manager = manager
+	pom, err := manager.ManagePartition(k.Topic, k.Partition)
+	c.pom = pom
+	return err
+}
 
-	manager, err := sarama.NewOffsetManagerFromClient(cfg.Kafka.GroupID, client)
-	if err != nil {
-		_ = consumer.Close()
-		_ = client.Close()
-		return nil, err
-	}
-
-	pom, err := manager.ManagePartition(cfg.Kafka.Topic, cfg.Kafka.Partition)
-	if err != nil {
-		_ = manager.Close()
-		_ = consumer.Close()
-		_ = client.Close()
-		return nil, err
-	}
-
-	nextOffset, _ := pom.NextOffset()
+func (c *Client) openPartition(k config.Kafka) error {
+	nextOffset, _ := c.pom.NextOffset()
 	if nextOffset == sarama.OffsetNewest {
 		nextOffset = sarama.OffsetOldest
 	}
+	pc, err := c.base.ConsumePartition(k.Topic, k.Partition, nextOffset)
+	c.consumer = pc
+	return err
+}
 
-	pc, err := consumer.ConsumePartition(cfg.Kafka.Topic, cfg.Kafka.Partition, nextOffset)
-	if err != nil {
-		_ = pom.Close()
-		_ = manager.Close()
-		_ = consumer.Close()
-		_ = client.Close()
-		return nil, err
-	}
-
-	producer, err := sarama.NewSyncProducerFromClient(client)
-	if err != nil {
-		_ = pc.Close()
-		_ = pom.Close()
-		_ = manager.Close()
-		_ = consumer.Close()
-		_ = client.Close()
-		return nil, err
-	}
-
-	return &Client{
-		client:    client,
-		consumer:  pc,
-		producer:  producer,
-		manager:   manager,
-		pom:       pom,
-		topic:     cfg.Kafka.Topic,
-		partition: cfg.Kafka.Partition,
-	}, nil
+func (c *Client) openProducer(config.Kafka) error {
+	producer, err := sarama.NewSyncProducerFromClient(c.client)
+	c.producer = producer
+	return err
 }
 
 func ensureTopic(client sarama.Client, topic string, numPartitions int32) error {
@@ -153,9 +164,15 @@ func (c *Client) Publish(key string, body []byte) error {
 }
 
 func (c *Client) Close() error {
-	_ = c.producer.Close()
-	_ = c.pom.Close()
-	_ = c.manager.Close()
-	_ = c.consumer.Close()
+	for _, part := range []closer{c.producer, c.consumer, c.pom, c.manager, c.base} {
+		closeIfOpen(part)
+	}
 	return c.client.Close()
+}
+
+func closeIfOpen(part closer) {
+	if part == nil {
+		return
+	}
+	_ = part.Close()
 }

@@ -69,60 +69,54 @@ func (r *Reader) queryMetric(ctx context.Context, expr string) (float64, time.Ti
 	if len(parts) != 3 {
 		return 0, time.Time{}, fmt.Errorf("invalid mapping %q: want Namespace/MetricName/Stat", expr)
 	}
-	namespace, metricName, stat := parts[0], parts[1], parts[2]
+	datapoints, err := r.statistics(ctx, parts[0], parts[1], parts[2])
+	if err != nil {
+		return 0, time.Time{}, err
+	}
+	if len(datapoints) == 0 {
+		return 0, time.Time{}, fmt.Errorf("no datapoints for %q", expr)
+	}
+	latest := latestDatapoint(datapoints)
+	return statValue(latest, parts[2]), *latest.Timestamp, nil
+}
 
+func (r *Reader) statistics(ctx context.Context, namespace, metricName, stat string) ([]cwtypes.Datapoint, error) {
 	now := time.Now()
-	startTime := now.Add(-time.Duration(r.cfg.Period*2) * time.Second)
-
 	out, err := r.client.GetMetricStatistics(ctx, &cloudwatch.GetMetricStatisticsInput{
 		Namespace:  aws.String(namespace),
 		MetricName: aws.String(metricName),
 		Statistics: []cwtypes.Statistic{cwtypes.Statistic(stat)},
 		Period:     aws.Int32(r.cfg.Period),
-		StartTime:  aws.Time(startTime),
+		StartTime:  aws.Time(now.Add(-time.Duration(r.cfg.Period*2) * time.Second)),
 		EndTime:    aws.Time(now),
 		Dimensions: r.dimensions,
 	})
 	if err != nil {
-		return 0, time.Time{}, err
+		return nil, err
 	}
-	if len(out.Datapoints) == 0 {
-		return 0, time.Time{}, fmt.Errorf("no datapoints for %q", expr)
-	}
+	return out.Datapoints, nil
+}
 
-	latest := out.Datapoints[0]
-	for _, dp := range out.Datapoints[1:] {
+func latestDatapoint(datapoints []cwtypes.Datapoint) cwtypes.Datapoint {
+	latest := datapoints[0]
+	for _, dp := range datapoints[1:] {
 		if dp.Timestamp.After(*latest.Timestamp) {
 			latest = dp
 		}
 	}
-
-	val := statValue(latest, stat)
-	return val, *latest.Timestamp, nil
+	return latest
 }
 
 func statValue(dp cwtypes.Datapoint, stat string) float64 {
-	switch stat {
-	case "Average":
-		if dp.Average != nil {
-			return *dp.Average
-		}
-	case "Sum":
-		if dp.Sum != nil {
-			return *dp.Sum
-		}
-	case "Maximum":
-		if dp.Maximum != nil {
-			return *dp.Maximum
-		}
-	case "Minimum":
-		if dp.Minimum != nil {
-			return *dp.Minimum
-		}
-	case "SampleCount":
-		if dp.SampleCount != nil {
-			return *dp.SampleCount
-		}
+	values := map[string]*float64{
+		"Average":     dp.Average,
+		"Sum":         dp.Sum,
+		"Maximum":     dp.Maximum,
+		"Minimum":     dp.Minimum,
+		"SampleCount": dp.SampleCount,
+	}
+	if v := values[stat]; v != nil {
+		return *v
 	}
 	return 0
 }

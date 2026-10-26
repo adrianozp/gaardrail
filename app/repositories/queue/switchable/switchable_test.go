@@ -22,8 +22,6 @@ func newQueue(t *testing.T, active string) *Queue {
 	return q
 }
 
-// fakeQueue is a minimal queue whose Dequeue blocks until the context is done,
-// used to drive lazy-construction tests without external dependencies.
 type fakeQueue struct{ name string }
 
 func (f *fakeQueue) Enqueue(entities.Message) (string, error) { return "", nil }
@@ -34,7 +32,6 @@ func (f *fakeQueue) Dequeue(ctx context.Context) (entities.Message, error) {
 func (f *fakeQueue) Ack(context.Context, entities.Message) error { return nil }
 func (f *fakeQueue) Size() (int64, error)                        { return 0, nil }
 
-// rawQueue builds a Queue with custom constructors for white-box lazy tests.
 func rawQueue(t *testing.T, active string, ctors map[string]func() (queue.Queue, error)) *Queue {
 	t.Helper()
 	q := &Queue{
@@ -126,8 +123,6 @@ func TestEnqueueSize_DelegateToActive(t *testing.T) {
 	assert.Equal(t, int64(-1), size, "constant reports infinite size (-1)")
 }
 
-// A worker blocked on an empty inmemory Dequeue must be released when the queue
-// is switched, then resume against the newly active queue.
 func TestDequeue_UnparkedOnSwitch(t *testing.T) {
 	q := newQueue(t, "inmemory")
 

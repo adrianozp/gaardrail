@@ -1,6 +1,9 @@
 package handlers
 
-import "github.com/adrianozp/gaardrail/app/entities"
+import (
+	"github.com/adrianozp/gaardrail/app/entities"
+	"github.com/adrianozp/gaardrail/pkg/ptr"
+)
 
 type updatePIDParamsRequest struct {
 	Kp       *float64 `json:"kp"`
@@ -15,7 +18,6 @@ type updatePIDParamsRequest struct {
 	SetpointFilterType *string `json:"setpoint_filter_type"`
 	SetpointFilterSize *int    `json:"setpoint_filter_size"`
 
-	// Smith predictor internal FOPDT model (ignored by other controllers).
 	ModelK        *float64 `json:"model_k"`
 	ModelTau      *float64 `json:"model_tau"`
 	ModelTheta    *float64 `json:"model_theta"`
@@ -55,7 +57,6 @@ type pidParamsResponse struct {
 	SetpointFilterType string `json:"setpoint_filter_type"`
 	SetpointFilterSize int    `json:"setpoint_filter_size"`
 
-	// Smith predictor internal FOPDT model (omitted for other controllers).
 	ModelK        *float64 `json:"model_k,omitempty"`
 	ModelTau      *float64 `json:"model_tau,omitempty"`
 	ModelTheta    *float64 `json:"model_theta,omitempty"`
@@ -63,40 +64,21 @@ type pidParamsResponse struct {
 }
 
 func pidParamsFromEntity(p entities.ControllerParams) pidParamsResponse {
-	r := pidParamsResponse{}
-	if p.Kp != nil {
-		r.Kp = *p.Kp
+	r := pidParamsResponse{
+		ModelK:        p.ModelK,
+		ModelTau:      p.ModelTau,
+		ModelTheta:    p.ModelTheta,
+		SampleSeconds: p.SampleSeconds,
 	}
-	if p.Ki != nil {
-		r.Ki = *p.Ki
-	}
-	if p.Kd != nil {
-		r.Kd = *p.Kd
-	}
-	if p.Min != nil {
-		r.Min = *p.Min
-	}
-	if p.Max != nil {
-		r.Max = *p.Max
-	}
-	if p.IClamp != nil {
-		r.IClamp = *p.IClamp
-	}
-	if p.Setpoint != nil {
-		r.Setpoint = *p.Setpoint
-	}
-	if p.FfGain != nil {
-		r.FfGain = *p.FfGain
-	}
-	if p.SetpointFilterType != nil {
-		r.SetpointFilterType = *p.SetpointFilterType
-	}
-	if p.SetpointFilterSize != nil {
-		r.SetpointFilterSize = *p.SetpointFilterSize
-	}
-	r.ModelK = p.ModelK
-	r.ModelTau = p.ModelTau
-	r.ModelTheta = p.ModelTheta
-	r.SampleSeconds = p.SampleSeconds
+	ptr.Assign(&r.Kp, p.Kp)
+	ptr.Assign(&r.Ki, p.Ki)
+	ptr.Assign(&r.Kd, p.Kd)
+	ptr.Assign(&r.Min, p.Min)
+	ptr.Assign(&r.Max, p.Max)
+	ptr.Assign(&r.IClamp, p.IClamp)
+	ptr.Assign(&r.Setpoint, p.Setpoint)
+	ptr.Assign(&r.FfGain, p.FfGain)
+	ptr.Assign(&r.SetpointFilterType, p.SetpointFilterType)
+	ptr.Assign(&r.SetpointFilterSize, p.SetpointFilterSize)
 	return r
 }

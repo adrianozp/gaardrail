@@ -5,7 +5,7 @@ type MetricsPoller struct {
 	IntervalMs int               `mapstructure:"interval_ms" default:"5000"`
 	Endpoint   string            `mapstructure:"endpoint"`
 	Protocol   string            `mapstructure:"protocol"    default:"exporter"`
-	Mappings   map[string]string `mapstructure:"mappings"` // config-file only, not env-overridable
+	Mappings   map[string]string `mapstructure:"mappings"`
 	FilterType string            `mapstructure:"filter_type" default:"none"`
 	FilterSize int               `mapstructure:"filter_size" default:"1"`
 }

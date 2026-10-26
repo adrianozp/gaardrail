@@ -51,15 +51,15 @@ func MetricsPollerInjections() fx.Option {
 }
 
 func MetricsPollerLifecycle() fx.Option {
-	return fx.Invoke(func(lc fx.Lifecycle, ph *pollmetrics.PollingHandler, cfg config.Config) {
-		if !cfg.MetricsPoller.Enabled {
-			return
-		}
-		lc.Append(fx.Hook{
-			OnStart: func(ctx context.Context) error {
-				return ph.Start(context.Background())
-			},
-			OnStop: ph.Stop,
-		})
+	return fx.Invoke(startMetricsPoller)
+}
+
+func startMetricsPoller(lc fx.Lifecycle, ph *pollmetrics.PollingHandler, cfg config.Config) {
+	if !cfg.MetricsPoller.Enabled {
+		return
+	}
+	lc.Append(fx.Hook{
+		OnStart: func(context.Context) error { return ph.Start(context.Background()) },
+		OnStop:  ph.Stop,
 	})
 }

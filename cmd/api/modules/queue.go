@@ -1,8 +1,6 @@
 package modules
 
 import (
-	"context"
-
 	queuequeryhandler "github.com/adrianozp/gaardrail/app/handlers/queuequery"
 	switchqueuehandler "github.com/adrianozp/gaardrail/app/handlers/switchqueue"
 	queuerepo "github.com/adrianozp/gaardrail/app/repositories/queue"
@@ -46,12 +44,11 @@ func QueueEndpoints() fx.Option {
 }
 
 func QueueLifecycle() fx.Option {
-	return fx.Invoke(func(lc fx.Lifecycle, cfg config.Config) {
-		lc.Append(fx.Hook{
-			OnStart: func(_ context.Context) error {
-				metrics.Gauge(map[string]float64{"queue_type": config.TypeCode(cfg.Queue.Protocol)})
-				return nil
-			},
-		})
-	})
+	return fx.Invoke(reportQueueType)
+}
+
+func reportQueueType(lc fx.Lifecycle, cfg config.Config) {
+	lc.Append(fx.StartHook(func() {
+		metrics.Gauge(map[string]float64{"queue_type": config.TypeCode(cfg.Queue.Protocol)})
+	}))
 }

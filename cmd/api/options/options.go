@@ -15,63 +15,74 @@ import (
 
 func Options() fx.Option {
 	return fx.Options(
-		fx.Provide(
-			config.Load,
-			config.NewPersister,
-			httpserver.New,
-		),
-
+		fx.Provide(config.Load, config.NewPersister, httpserver.New),
 		modules.MetricsLifecycle(),
+		queueModules(),
+		modules.OrchestratorFactories(),
+		modules.OrchestratorInjections(),
+		metricsPollerModules(),
+		messageModules(),
+		controllerModules(),
+		fx.Invoke(serveHTTP),
+		fx.Invoke(runOrchestrator),
+	)
+}
 
+func queueModules() fx.Option {
+	return fx.Options(
 		modules.QueueFactories(),
 		modules.QueueInjections(),
 		modules.QueueEndpoints(),
 		modules.QueueLifecycle(),
+	)
+}
 
-		modules.OrchestratorFactories(),
-		modules.OrchestratorInjections(),
-
+func metricsPollerModules() fx.Option {
+	return fx.Options(
 		modules.MetricsPollerFactories(),
 		modules.MetricsPollerInjections(),
 		modules.MetricsPollerLifecycle(),
+	)
+}
 
+func messageModules() fx.Option {
+	return fx.Options(
 		modules.MessageFactories(),
 		modules.MessageInjections(),
 		modules.MessageEndpoints(),
+	)
+}
 
+func controllerModules() fx.Option {
+	return fx.Options(
 		modules.ControllerFactories(),
 		modules.ControllerInjections(),
 		modules.ControllerEndpoints(),
-
-		fx.Invoke(func(lc fx.Lifecycle, router *gin.Engine, cfg config.Config) {
-			router.GET("/metrics", gin.WrapH(promhttp.Handler()))
-			lc.Append(fx.Hook{
-				OnStart: func(ctx context.Context) error {
-					if cfg.HTTP.TLSEnabled() {
-						go func() {
-							if err := router.RunTLS(cfg.HTTP.Addr, cfg.HTTP.CertFile, cfg.HTTP.KeyFile); err != nil {
-								log.Error().Err(err).Msg("options: http server (tls) stopped")
-							}
-						}()
-					} else {
-						go func() {
-							if err := router.Run(cfg.HTTP.Addr); err != nil {
-								log.Error().Err(err).Msg("options: http server stopped")
-							}
-						}()
-					}
-					return nil
-				},
-			})
-		}),
-
-		fx.Invoke(func(lc fx.Lifecycle, o *orchestrator.Orchestrator) {
-			lc.Append(fx.Hook{
-				OnStart: func(ctx context.Context) error {
-					return o.Start(context.Background())
-				},
-				OnStop: o.Stop,
-			})
-		}),
 	)
+}
+
+func serveHTTP(lc fx.Lifecycle, router *gin.Engine, cfg config.Config) {
+	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
+	lc.Append(fx.StartHook(func() { go runRouter(router, cfg.HTTP) }))
+}
+
+func runRouter(router *gin.Engine, http config.HTTP) {
+	if http.TLSEnabled() {
+		logStopped(router.RunTLS(http.Addr, http.CertFile, http.KeyFile), "options: http server (tls) stopped")
+		return
+	}
+	logStopped(router.Run(http.Addr), "options: http server stopped")
+}
+
+func logStopped(err error, msg string) {
+	if err != nil {
+		log.Error().Err(err).Msg(msg)
+	}
+}
+
+func runOrchestrator(lc fx.Lifecycle, o *orchestrator.Orchestrator) {
+	lc.Append(fx.Hook{
+		OnStart: func(context.Context) error { return o.Start(context.Background()) },
+		OnStop:  o.Stop,
+	})
 }

@@ -12,8 +12,6 @@ type Controller interface {
 	Type() string
 }
 
-// ConfigStore persists runtime changes back to the config file so they survive
-// a restart.
 type ConfigStore interface {
 	Set(updates map[string]any) error
 }

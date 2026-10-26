@@ -36,7 +36,6 @@ func TestRegisterMySQLTLS_BuiltinNames(t *testing.T) {
 	}{
 		{name: "skip verify", cfg: TLSConfig{Enabled: true, SkipVerify: true}, want: "skip-verify"},
 		{name: "default verification", cfg: TLSConfig{Enabled: true}, want: "true"},
-		// SkipVerify takes precedence over other options.
 		{name: "skip verify wins", cfg: TLSConfig{Enabled: true, SkipVerify: true, ServerName: "db"}, want: "skip-verify"},
 	}
 	for _, c := range cases {

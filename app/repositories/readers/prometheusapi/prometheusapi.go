@@ -56,42 +56,46 @@ func (r *Reader) Read(ctx context.Context) (entities.Metrics, error) {
 }
 
 func (r *Reader) queryValue(ctx context.Context, expr string) (float64, time.Time, error) {
-	reqURL := r.endpoint + "?query=" + url.QueryEscape(expr)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	apiResp, err := r.query(ctx, expr)
 	if err != nil {
 		return 0, time.Time{}, err
 	}
-	resp, err := r.http.Do(req)
-	if err != nil {
-		return 0, time.Time{}, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return 0, time.Time{}, fmt.Errorf("unexpected status %d", resp.StatusCode)
-	}
-
-	var apiResp apiResponse
-	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
-		return 0, time.Time{}, err
-	}
-
 	if len(apiResp.Data.Result) == 0 {
 		return 0, time.Time{}, fmt.Errorf("no results for query %q", expr)
 	}
+	return parseSample(apiResp.Data.Result[0].Value)
+}
 
+func (r *Reader) query(ctx context.Context, expr string) (apiResponse, error) {
+	reqURL := r.endpoint + "?query=" + url.QueryEscape(expr)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	if err != nil {
+		return apiResponse{}, err
+	}
+	resp, err := r.http.Do(req)
+	if err != nil {
+		return apiResponse{}, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return apiResponse{}, fmt.Errorf("unexpected status %d", resp.StatusCode)
+	}
+	var apiResp apiResponse
+	err = json.NewDecoder(resp.Body).Decode(&apiResp)
+	return apiResp, err
+}
+
+func parseSample(value [2]json.RawMessage) (float64, time.Time, error) {
 	var tsFloat float64
-	if err := json.Unmarshal(apiResp.Data.Result[0].Value[0], &tsFloat); err != nil {
+	if err := json.Unmarshal(value[0], &tsFloat); err != nil {
 		return 0, time.Time{}, err
 	}
 	sec := int64(tsFloat)
 	ts := time.Unix(sec, int64((tsFloat-float64(sec))*1e9)).UTC()
-
 	var valStr string
-	if err := json.Unmarshal(apiResp.Data.Result[0].Value[1], &valStr); err != nil {
+	if err := json.Unmarshal(value[1], &valStr); err != nil {
 		return 0, time.Time{}, err
 	}
-
 	val, err := strconv.ParseFloat(valStr, 64)
 	if err != nil {
 		return 0, time.Time{}, err

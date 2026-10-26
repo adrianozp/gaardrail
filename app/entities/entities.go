@@ -33,11 +33,8 @@ type ControllerParams struct {
 	SetpointFilterType *string
 	SetpointFilterSize *int
 
-	// FfGain is the plant static gain K used for feedforward: u_ff = setpoint/K.
-	// Zero disables feedforward. (PID controller.)
 	FfGain *float64
 
-	// Smith predictor internal FOPDT model (nil for other controllers).
 	ModelK        *float64
 	ModelTau      *float64
 	ModelTheta    *float64

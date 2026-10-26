@@ -14,15 +14,10 @@ type MetricsReader interface {
 	Read(ctx context.Context) (entities.Metrics, error)
 }
 
-// ProcessMetrics is the port for forwarding collected metrics into the PID pipeline.
 type ProcessMetrics interface {
 	Process(m entities.Metrics) error
 }
 
-// PollingHandler ticks on a configurable interval, reads metrics from a
-// MetricsReader, and forwards them to ProcessMetrics. Errors from Read are
-// logged and skipped — the PID controller retains its last state until the
-// next successful read.
 type PollingHandler struct {
 	reader         MetricsReader
 	processMetrics ProcessMetrics
@@ -43,13 +38,10 @@ func New(reader MetricsReader, pm ProcessMetrics, cfg config.Config) *PollingHan
 	}
 }
 
-// Done returns a channel that is closed when the run loop exits.
-// Useful in tests to assert clean shutdown.
 func (h *PollingHandler) Done() <-chan struct{} {
 	return h.done
 }
 
-// Start launches the polling goroutine. Must be called at most once.
 func (h *PollingHandler) Start(ctx context.Context) error {
 	ctx, h.cancel = context.WithCancel(ctx)
 	h.started = true

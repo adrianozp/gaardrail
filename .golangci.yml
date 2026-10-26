@@ -4,13 +4,6 @@ linters:
     paths:
       - "(^|/)mocks/"
     rules:
-      # model.NameValidationScheme is a documented escape hatch for globally
-      # toggling prometheus/common's metric-name validation scheme; it is
-      # process-wide mutable state, so removing/changing the assignment here
-      # is not verifiable as behavior-preserving without auditing every
-      # dependency's init() order. The one avoidable read of this deprecated
-      # var (passing it into expfmt.NewTextParser) was replaced with the
-      # literal model.UTF8Validation instead.
       - path: "app/repositories/readers/exporter/exporter.go"
         linters:
           - staticcheck

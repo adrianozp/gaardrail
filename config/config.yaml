@@ -1,7 +1,7 @@
 http:
   addr: ":8080"
 queue:
-  protocol: constant # constant queue: no Kafka needed, always emits the same query
+  protocol: constant
   capacity: 1000
   query: "SELECT id, val, score FROM flood_data ORDER BY RAND() LIMIT 100"
 kafka:
@@ -15,19 +15,16 @@ target:
   driver: mysql
   dsn: "root:root@tcp(localhost:3306)/gaardrail"
   tls:
-    enabled: false # true: encrypt the database connection (mysql only)
-    skip_verify: false # true: encrypt without verifying the server certificate (self-signed certs / tests)
-    ca_file: "" # optional: PEM CA bundle for full server verification
-    server_name: "" # optional: name used for certificate verification
+    enabled: false
+    skip_verify: false
+    ca_file: ""
+    server_name: ""
 metrics_poller:
   enabled: true
-  interval_ms: 5000 # T=5s (production: 60000 — CloudWatch/Azure/GCP)
+  interval_ms: 5000
   protocol: prometheusapi
   endpoint: "http://localhost:9090/api/v1/query"
   mappings:
-    # RAW value (as a real provider delivers it): irate = rate over the last 2 points.
-    # Smoothing happens in the controller (filter_size). Window >= 3x scrape for >= 2
-    # samples: [15s] with 5s scrape ([3m] with 60s scrape, [1m] with 1s).
     'irate(container_cpu_usage_seconds_total{container_label_com_docker_compose_service="mysql"}[15s])*100': cpu
 controller:
   type: "pidff"
@@ -35,26 +32,24 @@ orchestrator:
   rate: 0
   workers: 1
   burst: 5
-pid: # PIFF baseline at T=10s (PI documented in the regime-10s campaign, truncated at 3 decimals)
+pid:
   setpoint: 50
   kp: 0.058
   ki: 0.009
   kd: 0
   min: 0
-  max: 50 # headroom above the steady-state drain (~22 for setpoint 50%)
-  i_clamp: 40 # the integral must reach the steady-state drain (position form)
-  filter_size: 1 # raw metric (overshoot is handled by the setpoint soft-start)
-  ff_gain: 2.389 # feedforward u_ff=setpoint/K (K = static gain documented at T=10s) -> 0 disables
-  setpoint_filter_tau: 10 # soft-start ~2T (T=5s)
+  max: 50
+  i_clamp: 40
+  ff_gain: 2.389
+  setpoint_filter_tau: 10
 smith:
   setpoint: 50.0
-  kp: 0.042283 # gentle and stable (exp.12, ts=240s) — high gains oscillate at T=60s
+  kp: 0.042283
   ki: 0.00781074
   min: 0.0
   max: 40
   i_clamp: 40
-  model_k: 2.47465 # static gain of the identified FOPDT (%CPU per msg/s)
-  model_tau: 33.1391 # time constant (s)
-  model_theta: 61.74 # EFFECTIVE delay (continuous theta + ~T of ZOH/sampling) -> d=1 sample
-  sample_seconds: 5.0 # sampling period T (60.0 in production)
-  filter_size: 1 # raw metric at 60s is already an average of ~1300 queries/min; no extra MA
+  model_k: 2.47465
+  model_tau: 33.1391
+  model_theta: 61.74
+  sample_seconds: 5.0
